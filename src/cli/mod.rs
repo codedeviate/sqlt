@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::dialect::DialectId;
+use crate::encoding::Encoding;
 use crate::error::Result;
 
 #[derive(Debug, Parser)]
@@ -40,6 +41,10 @@ pub struct ParseArgs {
     #[arg(long)]
     pub pretty: bool,
 
+    /// Encoding of the input bytes. JSON output is always UTF-8.
+    #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
+    pub encoding: Encoding,
+
     /// Input file (use `-` or omit for stdin).
     pub input: Option<PathBuf>,
 }
@@ -49,6 +54,10 @@ pub struct EmitArgs {
     /// Target SQL dialect. Defaults to the dialect recorded in the JSON envelope.
     #[arg(long = "to", value_parser = parse_dialect)]
     pub to: Option<DialectId>,
+
+    /// Encoding of the SQL output bytes. JSON input is always read as UTF-8.
+    #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
+    pub encoding: Encoding,
 
     /// Input file (use `-` or omit for stdin).
     pub input: Option<PathBuf>,
@@ -68,12 +77,20 @@ pub struct TranslateArgs {
     #[arg(long)]
     pub strict: bool,
 
+    /// Encoding of the input and output SQL bytes.
+    #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
+    pub encoding: Encoding,
+
     /// Input file (use `-` or omit for stdin).
     pub input: Option<PathBuf>,
 }
 
 fn parse_dialect(s: &str) -> std::result::Result<DialectId, String> {
     s.parse::<DialectId>().map_err(|e| e.to_string())
+}
+
+fn parse_encoding(s: &str) -> std::result::Result<Encoding, String> {
+    s.parse::<Encoding>().map_err(|e| e.to_string())
 }
 
 pub fn run() -> Result<()> {
@@ -85,16 +102,35 @@ pub fn run() -> Result<()> {
     }
 }
 
-pub(crate) fn read_input(path: Option<&std::path::Path>) -> Result<String> {
+/// Read raw input bytes (file or stdin).
+pub(crate) fn read_input_bytes(path: Option<&std::path::Path>) -> Result<Vec<u8>> {
     use std::io::Read;
-    let mut buf = String::new();
+    let mut buf = Vec::new();
     match path {
         Some(p) if p.as_os_str() != "-" => {
-            buf = std::fs::read_to_string(p)?;
+            buf = std::fs::read(p)?;
         }
         _ => {
-            std::io::stdin().read_to_string(&mut buf)?;
+            std::io::stdin().read_to_end(&mut buf)?;
         }
     }
     Ok(buf)
+}
+
+/// Read input and decode as the given encoding.
+pub(crate) fn read_input_text(path: Option<&std::path::Path>, enc: Encoding) -> Result<String> {
+    let bytes = read_input_bytes(path)?;
+    enc.decode(&bytes)
+}
+
+/// Write SQL output. Encodes via `enc` and writes raw bytes to stdout so a
+/// non-UTF-8 result is preserved when piped or redirected to a file.
+pub(crate) fn write_sql(s: &str, enc: Encoding) -> Result<()> {
+    use std::io::Write;
+    let bytes = enc.encode(s)?;
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    out.write_all(&bytes)?;
+    out.write_all(b"\n")?;
+    Ok(())
 }

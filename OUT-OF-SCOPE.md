@@ -36,6 +36,12 @@ The intent is to upstream typed AST support for these to `apache/datafusion-sqlp
 - Comment preservation across translation (round-trip within one dialect preserves them via raw-SQL fallback; cross-dialect drops them).
 - Index / constraint name normalization.
 
+### Encodings
+- UTF-16 (LE/BE) input/output and BOM detection.
+- Auto-detection of input encoding (`chardetng` integration). Today the user must pass `--encoding` explicitly; we deliberately don't guess because heuristic detection silently corrupts data on short inputs.
+- Mixed-encoding input (e.g. SQL files with comments in one encoding and string literals in another).
+- Encoding negotiation between `--from` and `--to` (e.g. translating Latin-1 source SQL to UTF-8 output as a single command).
+
 ### CLI / UX
 - A formatting/pretty-printer with knobs beyond `--pretty` (line width, indent style, keyword case).
 - Watch mode / continuous translation.

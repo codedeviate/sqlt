@@ -14,6 +14,12 @@ pub enum Error {
     #[error("unknown dialect: {0}")]
     UnknownDialect(String),
 
+    #[error("unknown encoding: {0}")]
+    UnknownEncoding(String),
+
+    #[error("encoding error: {0}")]
+    Encoding(String),
+
     #[error("translation produced warnings (--strict)")]
     StrictWarnings,
 }

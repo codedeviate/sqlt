@@ -97,6 +97,106 @@ fn unknown_dialect_exits_two() {
 }
 
 #[test]
+fn parse_latin1_input_with_encoding_flag() {
+    // Build Latin-1 bytes that aren't valid UTF-8: SELECT 'café'
+    let mut bytes = b"SELECT 'caf".to_vec();
+    bytes.push(0xE9); // é in Latin-1
+    bytes.extend_from_slice(b"' FROM t");
+
+    // Write raw bytes to a temp file so the binary reads them unchanged.
+    let tmp = std::env::temp_dir().join("sqlt_latin1_test.sql");
+    std::fs::write(&tmp, &bytes).expect("write tmp");
+
+    // Default UTF-8 mode must reject the file because 0xE9 alone is invalid UTF-8.
+    let (_, stderr, code_default) = run(
+        sqlt().args(["parse", "--from", "mysql", tmp.to_str().unwrap()]),
+        "",
+    );
+    assert_eq!(
+        code_default, 1,
+        "default UTF-8 should reject Latin-1 file (got stderr: {stderr:?})"
+    );
+    assert!(
+        stderr.contains("encoding") || stderr.contains("utf-8"),
+        "stderr should mention encoding error: {stderr:?}"
+    );
+
+    // With --encoding latin1 it should parse and produce UTF-8 JSON.
+    let (json, _, code_latin1) = run(
+        sqlt().args([
+            "parse",
+            "--from",
+            "mysql",
+            "-e",
+            "latin1",
+            tmp.to_str().unwrap(),
+        ]),
+        "",
+    );
+    assert_eq!(
+        code_latin1, 0,
+        "latin1 decoding should succeed for high-bit bytes"
+    );
+    assert!(
+        json.contains("café"),
+        "JSON output (always UTF-8) should contain the decoded code points: {json:?}"
+    );
+}
+
+#[test]
+fn translate_latin1_preserves_bytes_through_pipeline() {
+    // SELECT 'naïve' in latin1: 0xEF for ï.
+    let mut bytes = b"SELECT 'na".to_vec();
+    bytes.push(0xEF);
+    bytes.extend_from_slice(b"ve'");
+    let tmp = std::env::temp_dir().join("sqlt_latin1_translate.sql");
+    std::fs::write(&tmp, &bytes).expect("write tmp");
+
+    let child = sqlt()
+        .args([
+            "translate",
+            "--from",
+            "mysql",
+            "--to",
+            "mariadb",
+            "-e",
+            "latin1",
+            tmp.to_str().unwrap(),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    let out = child.wait_with_output().expect("wait");
+    assert_eq!(out.status.code().unwrap(), 0);
+    // Output must contain 0xEF verbatim (no UTF-8 expansion).
+    assert!(
+        out.stdout.contains(&0xEF),
+        "expected raw latin1 byte 0xEF in output, got {:?}",
+        out.stdout
+    );
+    // And must not contain UTF-8 multibyte for ï (0xC3 0xAF).
+    assert!(
+        !out.stdout.windows(2).any(|w| w == [0xC3, 0xAF]),
+        "output must be latin1, not utf-8: {:?}",
+        out.stdout
+    );
+}
+
+#[test]
+fn unknown_encoding_exits_two() {
+    let (_, stderr, code) = run(
+        sqlt().args(["parse", "--from", "mysql", "-e", "ebcdic"]),
+        "SELECT 1",
+    );
+    assert_eq!(code, 2);
+    assert!(
+        stderr.contains("ebcdic") || stderr.contains("encoding"),
+        "stderr should mention the bad encoding: {stderr:?}"
+    );
+}
+
+#[test]
 fn multi_statement_input_parses_all_statements() {
     let multi = "SELECT 1; INSERT INTO t (a) VALUES (1); UPDATE t SET a = 2 WHERE a = 1";
     let (json, _, code) = run(sqlt().args(["parse", "--from", "mysql"]), multi);

@@ -1,5 +1,6 @@
 pub mod emit;
 pub mod parse;
+pub mod translate;
 
 use std::path::PathBuf;
 
@@ -25,6 +26,8 @@ pub enum Command {
     Parse(ParseArgs),
     /// Emit SQL from a JSON AST.
     Emit(EmitArgs),
+    /// Translate SQL between dialects.
+    Translate(TranslateArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -51,6 +54,24 @@ pub struct EmitArgs {
     pub input: Option<PathBuf>,
 }
 
+#[derive(Debug, clap::Args)]
+pub struct TranslateArgs {
+    /// Source SQL dialect.
+    #[arg(long = "from", value_parser = parse_dialect)]
+    pub from: DialectId,
+
+    /// Target SQL dialect.
+    #[arg(long = "to", value_parser = parse_dialect)]
+    pub to: DialectId,
+
+    /// Treat translation warnings as errors (exit code 3).
+    #[arg(long)]
+    pub strict: bool,
+
+    /// Input file (use `-` or omit for stdin).
+    pub input: Option<PathBuf>,
+}
+
 fn parse_dialect(s: &str) -> std::result::Result<DialectId, String> {
     s.parse::<DialectId>().map_err(|e| e.to_string())
 }
@@ -60,6 +81,7 @@ pub fn run() -> Result<()> {
     match cli.command {
         Command::Parse(args) => parse::run(args),
         Command::Emit(args) => emit::run(args),
+        Command::Translate(args) => translate::run(args),
     }
 }
 

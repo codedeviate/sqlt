@@ -1,3 +1,4 @@
+pub mod caps;
 pub mod mariadb;
 
 use std::str::FromStr;

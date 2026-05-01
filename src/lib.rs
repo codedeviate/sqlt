@@ -9,3 +9,4 @@ pub mod emit;
 pub mod error;
 pub mod json;
 pub mod parse;
+pub mod translate;

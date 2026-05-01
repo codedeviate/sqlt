@@ -45,6 +45,11 @@ fn mysql_fixtures_parse() {
 }
 
 #[test]
+fn mariadb_fixtures_parse() {
+    check_dialect(DialectId::MariaDb, "mariadb");
+}
+
+#[test]
 fn postgres_fixtures_parse() {
     check_dialect(DialectId::Postgres, "postgres");
 }

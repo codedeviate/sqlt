@@ -1,3 +1,5 @@
+pub mod mariadb;
+
 use std::str::FromStr;
 
 use sqlparser::dialect::{
@@ -10,6 +12,7 @@ use crate::error::Error;
 #[serde(rename_all = "lowercase")]
 pub enum DialectId {
     MySql,
+    MariaDb,
     Postgres,
     MsSql,
     Sqlite,
@@ -20,6 +23,7 @@ impl DialectId {
     pub fn upstream(self) -> Box<dyn Dialect> {
         match self {
             DialectId::MySql => Box::new(MySqlDialect {}),
+            DialectId::MariaDb => Box::new(mariadb::MariaDbDialect::new()),
             DialectId::Postgres => Box::new(PostgreSqlDialect {}),
             DialectId::MsSql => Box::new(MsSqlDialect {}),
             DialectId::Sqlite => Box::new(SQLiteDialect {}),
@@ -30,6 +34,7 @@ impl DialectId {
     pub fn as_str(self) -> &'static str {
         match self {
             DialectId::MySql => "mysql",
+            DialectId::MariaDb => "mariadb",
             DialectId::Postgres => "postgres",
             DialectId::MsSql => "mssql",
             DialectId::Sqlite => "sqlite",
@@ -44,6 +49,7 @@ impl FromStr for DialectId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "mysql" => Ok(DialectId::MySql),
+            "mariadb" | "maria" => Ok(DialectId::MariaDb),
             "postgres" | "postgresql" | "pg" => Ok(DialectId::Postgres),
             "mssql" | "tsql" | "sqlserver" => Ok(DialectId::MsSql),
             "sqlite" => Ok(DialectId::Sqlite),

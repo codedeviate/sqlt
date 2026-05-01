@@ -1,0 +1,1 @@
+CREATE PACKAGE pkg AS PROCEDURE p(); END pkg

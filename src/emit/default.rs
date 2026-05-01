@@ -1,18 +1,20 @@
-use sqlparser::ast::Statement;
-
+use crate::ast::SqltStatement;
 use crate::error::Result;
 
-/// Default emitter: delegates to the upstream `Display` impl for each
-/// statement and joins with `;\n`. Used for any dialect that doesn't supply
-/// its own emitter.
-pub fn emit(stmts: &[Statement]) -> Result<String> {
+/// Default emitter: delegates to the upstream `Display` impl for each `Std`
+/// statement and emits raw text verbatim for `Raw` statements. Statements
+/// are joined with `;\n`.
+pub fn emit(stmts: &[SqltStatement]) -> Result<String> {
+    use std::fmt::Write;
     let mut out = String::new();
     for (i, stmt) in stmts.iter().enumerate() {
         if i > 0 {
             out.push_str(";\n");
         }
-        use std::fmt::Write;
-        write!(&mut out, "{stmt}").expect("write to String never fails");
+        match stmt {
+            SqltStatement::Std(s) => write!(&mut out, "{s}").expect("infallible"),
+            SqltStatement::Raw(r) => out.push_str(r.sqlt_raw.trim_end_matches(';').trim_end()),
+        }
     }
     Ok(out)
 }

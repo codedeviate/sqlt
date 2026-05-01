@@ -77,6 +77,11 @@ fn mysql_roundtrip() {
 }
 
 #[test]
+fn mariadb_roundtrip() {
+    check_dialect(DialectId::MariaDb, "mariadb");
+}
+
+#[test]
 fn postgres_roundtrip() {
     check_dialect(DialectId::Postgres, "postgres");
 }

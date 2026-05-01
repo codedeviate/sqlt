@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::Statement;
 
+use crate::ast::SqltStatement;
 use crate::dialect::DialectId;
 
 pub const SQLT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -9,11 +9,11 @@ pub const SQLT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct Envelope {
     pub sqlt_version: String,
     pub dialect: DialectId,
-    pub statements: Vec<Statement>,
+    pub statements: Vec<SqltStatement>,
 }
 
 impl Envelope {
-    pub fn new(dialect: DialectId, statements: Vec<Statement>) -> Self {
+    pub fn new(dialect: DialectId, statements: Vec<SqltStatement>) -> Self {
         Self {
             sqlt_version: SQLT_VERSION.to_string(),
             dialect,

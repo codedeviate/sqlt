@@ -1,3 +1,4 @@
+pub mod emit;
 pub mod parse;
 
 use std::path::PathBuf;
@@ -22,6 +23,8 @@ pub struct Cli {
 pub enum Command {
     /// Parse SQL into a JSON AST.
     Parse(ParseArgs),
+    /// Emit SQL from a JSON AST.
+    Emit(EmitArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -38,6 +41,16 @@ pub struct ParseArgs {
     pub input: Option<PathBuf>,
 }
 
+#[derive(Debug, clap::Args)]
+pub struct EmitArgs {
+    /// Target SQL dialect. Defaults to the dialect recorded in the JSON envelope.
+    #[arg(long = "to", value_parser = parse_dialect)]
+    pub to: Option<DialectId>,
+
+    /// Input file (use `-` or omit for stdin).
+    pub input: Option<PathBuf>,
+}
+
 fn parse_dialect(s: &str) -> std::result::Result<DialectId, String> {
     s.parse::<DialectId>().map_err(|e| e.to_string())
 }
@@ -46,6 +59,7 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Parse(args) => parse::run(args),
+        Command::Emit(args) => emit::run(args),
     }
 }
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-02
+
 ### Added
 - Initial project scaffolding: Cargo manifest, module layout, conventions documentation.
 - `sqlt parse --from <dialect> [--pretty] [file|-]` subcommand. Reads SQL from a file or stdin and emits a JSON envelope `{ sqlt_version, dialect, statements }` using the upstream sqlparser AST's serde representation.
@@ -28,4 +30,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The `statements` field of the JSON envelope is now `Vec<SqltStatement>` instead of `Vec<Statement>`. For typed statements the on-the-wire shape is unchanged thanks to `#[serde(untagged)]`; only raw fallback fragments introduce a new shape.
 
-[Unreleased]: https://github.com/thomasbjork/sqlt/compare/HEAD...HEAD
+[Unreleased]: https://github.com/thomasbjork/sqlt/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/thomasbjork/sqlt/releases/tag/v0.1.0

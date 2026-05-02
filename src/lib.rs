@@ -9,5 +9,6 @@ pub mod emit;
 pub mod encoding;
 pub mod error;
 pub mod json;
+pub mod lint;
 pub mod parse;
 pub mod translate;

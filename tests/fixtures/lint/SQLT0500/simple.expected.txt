@@ -1,0 +1,3 @@
+simple.sql:1:8: info [SQLT0500] SELECT * returns every column, including ones the query does not need
+simple.sql:1:8:   help: enumerate the columns the query actually uses
+1 diagnostic: 0 errors, 0 warnings, 1 info

@@ -1,4 +1,5 @@
 pub mod emit;
+pub mod lint;
 pub mod parse;
 pub mod translate;
 
@@ -9,6 +10,7 @@ use clap::{Parser, Subcommand};
 use crate::dialect::DialectId;
 use crate::encoding::Encoding;
 use crate::error::Result;
+use crate::lint::format::Format as LintFormat;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -29,6 +31,8 @@ pub enum Command {
     Emit(EmitArgs),
     /// Translate SQL between dialects.
     Translate(TranslateArgs),
+    /// Lint SQL for common pitfalls and improvement suggestions.
+    Lint(LintArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -89,6 +93,52 @@ fn parse_dialect(s: &str) -> std::result::Result<DialectId, String> {
     s.parse::<DialectId>().map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+#[clap(rename_all = "kebab-case")]
+pub enum ExitOn {
+    Error,
+    Warning,
+    Info,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct LintArgs {
+    /// Source SQL dialect (required unless --explain is given).
+    #[arg(long = "from", value_parser = parse_dialect)]
+    pub from: Option<DialectId>,
+
+    /// Target SQL dialect (enables translation pre-flight rules).
+    #[arg(long = "to", value_parser = parse_dialect)]
+    pub to: Option<DialectId>,
+
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = LintFormat::Text)]
+    pub format: LintFormat,
+
+    /// Enable a rule (repeatable). Accepts SQLT0500, 0500, 500, or slug.
+    #[arg(long = "rule")]
+    pub rule: Vec<String>,
+
+    /// Disable a rule (repeatable). Same id forms as --rule.
+    #[arg(long = "no-rule")]
+    pub no_rule: Vec<String>,
+
+    /// Exit non-zero when any diagnostic is at or above this severity.
+    #[arg(long = "exit-on", value_enum, default_value_t = ExitOn::Error)]
+    pub exit_on: ExitOn,
+
+    /// Print rule documentation and exit.
+    #[arg(long = "explain")]
+    pub explain: Option<String>,
+
+    /// Encoding of the input bytes.
+    #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
+    pub encoding: Encoding,
+
+    /// Input file (use `-` or omit for stdin).
+    pub input: Option<PathBuf>,
+}
+
 fn parse_encoding(s: &str) -> std::result::Result<Encoding, String> {
     s.parse::<Encoding>().map_err(|e| e.to_string())
 }
@@ -99,6 +149,7 @@ pub fn run() -> Result<()> {
         Command::Parse(args) => parse::run(args),
         Command::Emit(args) => emit::run(args),
         Command::Translate(args) => translate::run(args),
+        Command::Lint(args) => lint::run(args),
     }
 }
 

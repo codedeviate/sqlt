@@ -22,6 +22,12 @@ pub enum Error {
 
     #[error("translation produced warnings (--strict)")]
     StrictWarnings,
+
+    #[error("unknown rule: {0}")]
+    UnknownRule(String),
+
+    #[error("lint findings at or above the --exit-on threshold")]
+    LintFindings,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

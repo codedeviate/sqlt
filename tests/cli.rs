@@ -184,6 +184,68 @@ fn translate_latin1_preserves_bytes_through_pipeline() {
 }
 
 #[test]
+fn lint_select_star_warns_and_exits_zero_by_default() {
+    let (stdout, _, code) = run(
+        sqlt().args(["lint", "--from", "mysql"]),
+        "SELECT * FROM users",
+    );
+    assert_eq!(
+        code, 0,
+        "info severity below default --exit-on=error threshold"
+    );
+    assert!(
+        stdout.contains("SQLT0500"),
+        "stdout missing rule id: {stdout:?}"
+    );
+    assert!(
+        stdout.contains("help:"),
+        "stdout missing help line: {stdout:?}"
+    );
+}
+
+#[test]
+fn lint_exit_on_info_promotes_to_failure() {
+    let (_, _, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--exit-on", "info"]),
+        "SELECT * FROM users",
+    );
+    assert_eq!(code, 1);
+}
+
+#[test]
+fn lint_no_rule_disables() {
+    let (stdout, _, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--no-rule", "SQLT0500"]),
+        "SELECT * FROM users",
+    );
+    assert_eq!(code, 0);
+    assert!(
+        !stdout.contains("SQLT0500"),
+        "rule should be disabled: {stdout:?}"
+    );
+    assert!(stdout.contains("0 diagnostics"));
+}
+
+#[test]
+fn lint_unknown_rule_exits_two() {
+    let (_, stderr, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--no-rule", "SQLT9999"]),
+        "SELECT 1",
+    );
+    assert_eq!(code, 2);
+    assert!(stderr.contains("unknown rule"), "stderr: {stderr:?}");
+}
+
+#[test]
+fn lint_explain_prints_docs_and_exits_zero() {
+    let (stdout, _, code) = run(sqlt().args(["lint", "--explain", "SQLT0500"]), "");
+    assert_eq!(code, 0);
+    assert!(stdout.contains("SQLT0500"));
+    assert!(stdout.contains("select-star"));
+    assert!(stdout.contains("category: perf"));
+}
+
+#[test]
 fn unknown_encoding_exits_two() {
     let (_, stderr, code) = run(
         sqlt().args(["parse", "--from", "mysql", "-e", "ebcdic"]),

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `--help-mode auto|always|never` flag on `sqlt lint` controlling text-format help rendering. `auto` (default) deduplicates per `(rule_id, suggestion)`. `always` restores the per-finding rendering. `never` suppresses help entirely.
 - `--no-help` flag as a shorthand for `--help-mode never`.
+- `--verbose` / `-v` flag on `sqlt lint`. SQLT0001 (raw-passthrough) is now off by default — real `mariadb-dump` output emits hundreds of fragments sqlparser can't parse (DISABLE/ENABLE KEYS, DELIMITER directives, CREATE DEFINER prefixes), and the flood of identical warnings drowned the typed-AST rule findings. `--verbose` enables SQLT0001 (equivalent to `--rule SQLT0001`).
 
 ### Removed
 - `src/dialect/mariadb.rs` (the `MariaDbDialect` wrapper struct). It was the source of the silent feature-flag disablement above. MariaDB-specific parser tweaks now live in `src/parse/mod.rs::preprocess_mariadb`.

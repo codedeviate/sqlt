@@ -12,13 +12,20 @@ const META_RAW: RuleMeta = RuleMeta {
     name: "raw-passthrough",
     category: Category::Raw,
     default_severity: Severity::Warning,
-    default_enabled: true,
+    // Off by default: real `mariadb-dump` output emits hundreds of fragments
+    // sqlparser can't parse (DISABLE/ENABLE KEYS, DELIMITER directives,
+    // CREATE DEFINER prefixes, …) and a flood of identical SQLT0001 warnings
+    // drowns out the typed-AST rule findings. Pass `sqlt lint --verbose`
+    // (or `-v`) to surface them, or `--rule SQLT0001` to opt in explicitly.
+    default_enabled: false,
     summary: "A statement fell back to raw passthrough — no typed AST in sqlparser 0.59.",
-    explanation: "MariaDB constructs that don't yet have a typed sqlparser node — system \
-                  versioning, FOR SYSTEM_TIME, CREATE PACKAGE, MariaDB sequence option ordering, \
-                  vector types — are kept as raw text. Same-dialect round-trip preserves them; \
-                  cross-dialect translation will reject them with a RAW_PASSTHROUGH warning. The \
-                  `reason` field on the parsed JSON envelope identifies which class of construct \
+    explanation: "Disabled by default; pass `--verbose` / `-v` to surface these. MariaDB \
+                  constructs that don't yet have a typed sqlparser node — system versioning, \
+                  FOR SYSTEM_TIME, CREATE PACKAGE, MariaDB sequence option ordering, vector \
+                  types, DISABLE/ENABLE KEYS, DELIMITER directives, CREATE DEFINER prefixes — \
+                  are kept as raw text. Same-dialect round-trip preserves them; cross-dialect \
+                  translation will reject them with a RAW_PASSTHROUGH warning. The `reason` \
+                  field on the parsed JSON envelope identifies which class of construct \
                   triggered the fallback.",
 };
 

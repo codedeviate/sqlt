@@ -40,7 +40,7 @@ expression: normalised
                 "level": "warning"
               },
               "fullDescription": {
-                "text": "MariaDB constructs that don't yet have a typed sqlparser node — system versioning, FOR SYSTEM_TIME, CREATE PACKAGE, MariaDB sequence option ordering, vector types — are kept as raw text. Same-dialect round-trip preserves them; cross-dialect translation will reject them with a RAW_PASSTHROUGH warning. The `reason` field on the parsed JSON envelope identifies which class of construct triggered the fallback."
+                "text": "Disabled by default; pass `--verbose` / `-v` to surface these. MariaDB constructs that don't yet have a typed sqlparser node — system versioning, FOR SYSTEM_TIME, CREATE PACKAGE, MariaDB sequence option ordering, vector types, DISABLE/ENABLE KEYS, DELIMITER directives, CREATE DEFINER prefixes — are kept as raw text. Same-dialect round-trip preserves them; cross-dialect translation will reject them with a RAW_PASSTHROUGH warning. The `reason` field on the parsed JSON envelope identifies which class of construct triggered the fallback."
               },
               "id": "SQLT0001",
               "name": "raw-passthrough",

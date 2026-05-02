@@ -33,8 +33,12 @@ pub fn run(args: LintArgs) -> Result<()> {
     let sql = read_input_text(args.input.as_deref(), args.encoding)?;
     let stmts = parse::parse(&sql, from)?;
 
+    let mut enable = args.rule.clone();
+    if args.verbose {
+        enable.push("SQLT0001".to_string());
+    }
     let opts = LintOptions {
-        enable: args.rule.clone(),
+        enable,
         disable: args.no_rule.clone(),
     };
     let mut diagnostics = lint::lint(&stmts, &sql, from, args.to, &opts)?;

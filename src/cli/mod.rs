@@ -144,6 +144,14 @@ pub struct LintArgs {
     #[arg(long = "no-help", conflicts_with = "help_mode")]
     pub no_help: bool,
 
+    /// Show diagnostics from rules that are off by default — currently
+    /// just SQLT0001 (raw-passthrough), which floods real mariadb-dump
+    /// output with hundreds of identical warnings about
+    /// optimization-hint / DELIMITER / DEFINER fragments sqlparser can't
+    /// parse. Equivalent to passing `--rule SQLT0001`.
+    #[arg(long = "verbose", short = 'v')]
+    pub verbose: bool,
+
     /// Enable a rule (repeatable). Accepts SQLT0500, 0500, 500, or slug.
     #[arg(long = "rule")]
     pub rule: Vec<String>,

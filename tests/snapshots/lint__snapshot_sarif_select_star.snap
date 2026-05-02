@@ -794,6 +794,82 @@ expression: normalised
               "shortDescription": {
                 "text": "`GROUP BY <number>` references a projection column by position."
               }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Postgres and MSSQL require every subquery in FROM to have an alias. MySQL/MariaDB allow it but the resulting plan is hard to read. Add an alias."
+              },
+              "id": "SQLT0701",
+              "name": "unaliased-derived-table",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "A derived table without an alias is rejected by most dialects at runtime."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "SQL guarantees no row order in the absence of ORDER BY. A LIMIT without ORDER BY may return different rows on different runs (and almost certainly will across replicas, vacuum cycles, or storage layouts). Add an explicit ORDER BY for any page-able query."
+              },
+              "id": "SQLT0704",
+              "name": "non-deterministic-pagination",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "style"
+                ]
+              },
+              "shortDescription": {
+                "text": "`LIMIT` without `ORDER BY` returns an arbitrary subset of rows."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Floating-point types cannot represent 0.10 exactly. For money use a fixed-point type — DECIMAL/NUMERIC with explicit precision and scale. Heuristic: the rule fires when the column name matches /(price|amount|total|balance|cost|fee)/i. False positives are possible."
+              },
+              "id": "SQLT0801",
+              "name": "float-for-money",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "ddl"
+                ]
+              },
+              "shortDescription": {
+                "text": "FLOAT/REAL/DOUBLE for a money-shaped column loses cents to rounding."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "PostgreSQL allows `VARCHAR` with no length and treats it as unlimited. MySQL requires a length. MSSQL silently truncates to 1 character — a classic data-loss bug. Always declare an explicit length: `VARCHAR(255)`."
+              },
+              "id": "SQLT0802",
+              "name": "varchar-without-length",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "ddl"
+                ]
+              },
+              "shortDescription": {
+                "text": "`VARCHAR` without an explicit length means different things across dialects."
+              }
             }
           ],
           "version": "<X.Y.Z>"

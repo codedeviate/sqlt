@@ -59,6 +59,12 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::subquery::ScalarSubqueryInSelect),
         Box::new(rules::subquery::OrderByInSubqueryWithoutLimit),
         Box::new(rules::subquery::CorrelatedSubqueryInWhere),
+        // style
+        Box::new(rules::style::UnaliasedDerivedTable),
+        Box::new(rules::style::NonDeterministicPagination),
+        // ddl
+        Box::new(rules::ddl::FloatForMoney),
+        Box::new(rules::ddl::VarcharWithoutLength),
     ];
     v.sort_by_key(|r| r.meta().id);
     v

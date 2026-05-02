@@ -154,6 +154,120 @@ expression: normalised
                 "level": "warning"
               },
               "fullDescription": {
+                "text": "MySQL and MSSQL lack RETURNING. `sqlt translate` will drop the clause; under `--strict` the translation fails. If the surrounding code consumes the returned rows, the application will need to fetch them with a separate SELECT."
+              },
+              "id": "SQLT0200",
+              "name": "preflight-returning-unsupported",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "pre-flight"
+                ]
+              },
+              "shortDescription": {
+                "text": "Target dialect does not support RETURNING on this DML statement."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "MySQL/MariaDB-only. Postgres and SQLite use `ON CONFLICT (...) DO UPDATE SET ...`; MSSQL uses `MERGE`. `sqlt translate` rewrites the simple cases."
+              },
+              "id": "SQLT0201",
+              "name": "preflight-on-duplicate-unsupported",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "pre-flight"
+                ]
+              },
+              "shortDescription": {
+                "text": "Target dialect does not support `ON DUPLICATE KEY UPDATE`."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Postgres/SQLite-specific. MySQL/MariaDB use `ON DUPLICATE KEY UPDATE`; MSSQL uses `MERGE`. `sqlt translate` rewrites the simple cases."
+              },
+              "id": "SQLT0202",
+              "name": "preflight-on-conflict-unsupported",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "pre-flight"
+                ]
+              },
+              "shortDescription": {
+                "text": "Target dialect does not support `ON CONFLICT`."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "MySQL and SQLite lack named sequences. Use `AUTO_INCREMENT` / `AUTOINCREMENT` on the column, or maintain a counter table by hand. `sqlt translate` will warn and emit the original SQL verbatim."
+              },
+              "id": "SQLT0203",
+              "name": "preflight-create-sequence-unsupported",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "pre-flight"
+                ]
+              },
+              "shortDescription": {
+                "text": "Target dialect does not support `CREATE SEQUENCE`."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Constructs like WITH SYSTEM VERSIONING, FOR SYSTEM_TIME, CREATE PACKAGE, and vector types fall back to raw text in v1. `sqlt translate` will emit the original SQL with a RAW_PASSTHROUGH warning; the target server will reject it."
+              },
+              "id": "SQLT0204",
+              "name": "preflight-raw-passthrough-unsupported",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "pre-flight"
+                ]
+              },
+              "shortDescription": {
+                "text": "MariaDB-specific construct cannot be represented in non-MariaDB targets."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Disabled by default — the emitter renders identifiers using the upstream Display impl, which is generally faithful for the target dialect. Opt-in for cases where you want every quote-style change flagged for review."
+              },
+              "id": "SQLT0205",
+              "name": "preflight-quote-style-mismatch",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "pre-flight"
+                ]
+              },
+              "shortDescription": {
+                "text": "Identifier quote style won't survive emit to the target dialect."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
                 "text": "A comma-separated FROM clause produces a cartesian product unless the WHERE clause filters it down. Even when correct, modern explicit `JOIN ... ON` syntax is much more readable. Mixing comma joins with explicit JOINs (see SQLT0307) is a precedence bug magnet."
               },
               "id": "SQLT0300",

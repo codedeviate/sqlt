@@ -20,6 +20,13 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::dialect_xc::PostgresDoubleColonCastInMysql),
         Box::new(rules::dialect_xc::MysqlOnDuplicateKeyInNonMysql),
         Box::new(rules::dialect_xc::ReturningInMysql),
+        // pre-flight (uses --to)
+        Box::new(rules::pre_flight::PreflightReturningUnsupported),
+        Box::new(rules::pre_flight::PreflightOnDuplicateUnsupported),
+        Box::new(rules::pre_flight::PreflightOnConflictUnsupported),
+        Box::new(rules::pre_flight::PreflightCreateSequenceUnsupported),
+        Box::new(rules::pre_flight::PreflightRawPassthroughUnsupported),
+        Box::new(rules::pre_flight::PreflightQuoteStyleMismatch),
         // perf
         Box::new(rules::perf::SelectStar),
         Box::new(rules::perf::SelectStarQualified),

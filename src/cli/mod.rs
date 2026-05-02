@@ -13,24 +13,80 @@ use crate::encoding::Encoding;
 use crate::error::Result;
 use crate::lint::format::Format as LintFormat;
 
+const LINT_LONG_ABOUT: &str = "\
+Analyze SQL for pitfalls and improvement suggestions.
+
+Runs a curated ruleset over the parsed AST and reports diagnostics with
+stable rule IDs (e.g. `SQLT0500`), short slugs (`select-star`), and inline
+suggestions.
+
+Rule categories:
+ - raw          (SQLT00xx)  Raw passthrough (off by default; see -v)
+ - dialect-xc   (SQLT01xx)  Dialect cross-contamination
+ - pre-flight   (SQLT02xx)  Translation pre-flight (only with --to)
+ - joins        (SQLT03xx)  Implicit cross joins, NATURAL JOIN, ON 1=1
+ - subquery     (SQLT04xx)  IN (SELECT) -> EXISTS, correlated subqueries
+ - perf         (SQLT05xx)  SELECT *, leading-wildcard LIKE, fn-on-column
+ - correctness  (SQLT06xx)  = NULL, UPDATE/DELETE without WHERE
+ - style        (SQLT07xx)  Unaliased derived tables, LIMIT without ORDER BY
+ - ddl          (SQLT08xx)  Float-for-money, VARCHAR without length
+
+Common discoverability flags:
+ - sqlt lint --examples         in-depth usage examples
+ - sqlt lint --list-rules       every registered rule with one-line summary
+ - sqlt lint --explain <ID>     long-form documentation for a rule
+
+Output formats (--format):
+ - text     grep-friendly single-line per finding (default)
+ - pretty   grouped per file with snippet pointer and inline rule explanation
+ - json     structured for tooling / CI ingestion
+ - sarif    SARIF 2.1.0 for GitHub code-scanning integration
+
+Exit-code controls:
+ - --exit-on error     (default) exit 1 only on errors
+ - --exit-on warning   exit 1 on errors and warnings
+ - --exit-on info      exit 1 on any finding
+ - --severity is OUTPUT-only and does NOT affect --exit-on";
+
+const TOP_LEVEL_LONG_ABOUT: &str = "\
+Multi-dialect SQL parser, translator, and linter.
+
+Supported dialects:
+ - mysql                                MySQL 5.7+ / 8.0
+ - mariadb                              MariaDB (first-class; not aliased to MySQL)
+ - postgres (aliases: postgresql, pg)   PostgreSQL
+ - mssql    (aliases: tsql, sqlserver)  Microsoft SQL Server / T-SQL
+ - sqlite                               SQLite
+ - generic                              Permissive fallback dialect
+
+Supported encodings (--encoding / -e):
+ - utf-8         (default; always used for JSON I/O)
+ - iso-8859-1    (alias: latin1)
+ - windows-1252  (alias: cp1252, win1252)
+
+Reads input from:
+ - a file path (positional argument)
+ - stdin (when no path is given, or when `-` is passed)
+
+Discoverability:
+ - sqlt <COMMAND> --help        full long-form help for any subcommand
+ - sqlt <COMMAND> --examples    in-depth usage examples
+ - sqlt lint --list-rules       every registered lint rule with id + summary
+ - sqlt lint --explain <ID>     long-form documentation for one rule
+
+Exit codes:
+ - 0   clean
+ - 1   parse error, encoding error, or lint findings >= --exit-on threshold
+ - 2   usage error (unknown dialect, unknown rule, bad flag combination)
+ - 3   `translate --strict` saw at least one warning";
+
 /// `sqlt` — multi-dialect SQL parser, translator, and linter.
-///
-/// Supports MySQL, MariaDB (first-class, not aliased to MySQL), PostgreSQL,
-/// MSSQL (T-SQL), SQLite, and a permissive Generic dialect. Reads SQL from
-/// a file or stdin, decodes any of utf-8 / iso-8859-1 / windows-1252.
-///
-/// Pass `--examples` to any subcommand for in-depth examples, e.g.
-/// `sqlt parse --examples`.
 #[derive(Debug, Parser)]
 #[command(
     name = "sqlt",
     version,
     about = "Multi-dialect SQL parser, translator, and linter",
-    long_about = "Multi-dialect SQL parser, translator, and linter.\n\n\
-                  Supports MySQL, MariaDB (first-class), PostgreSQL, MSSQL (T-SQL), \
-                  SQLite, and a Generic fallback dialect. Reads from a file or stdin, \
-                  decodes any of utf-8 / iso-8859-1 / windows-1252.\n\n\
-                  Run `sqlt <SUBCOMMAND> --examples` for in-depth usage of any subcommand."
+    long_about = TOP_LEVEL_LONG_ABOUT,
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -67,16 +123,7 @@ pub enum Command {
     /// See `sqlt translate --examples` for in-depth examples.
     Translate(TranslateArgs),
     /// Analyze SQL for pitfalls and improvement suggestions.
-    ///
-    /// Runs ~38 lint rules across 8 categories: dialect cross-contamination,
-    /// translation pre-flight (when `--to` is set), join hygiene, subquery
-    /// improvements, performance pitfalls, correctness pitfalls, style, DDL
-    /// hygiene. Every rule has a stable id (e.g. `SQLT0500`), a short slug
-    /// (`select-star`), and inline documentation accessible via
-    /// `--explain`.
-    ///
-    /// See `sqlt lint --examples` for in-depth examples and
-    /// `sqlt lint --list-rules` for the full ruleset.
+    #[command(long_about = LINT_LONG_ABOUT)]
     Lint(LintArgs),
 }
 

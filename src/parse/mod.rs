@@ -42,13 +42,25 @@ pub fn parse(sql: &str, dialect: DialectId) -> Result<Vec<SqltStatement>> {
 /// Pre-process MariaDB SQL to massage out forms that `MySqlDialect` rejects
 /// even though the real MariaDB server accepts them.
 ///
-/// Currently handles one case: bare `--` immediately followed by EOL. Real
-/// `mariadb-dump` output uses `--` on a line by itself as a separator
-/// comment. `MySqlDialect::requires_single_line_comment_whitespace` is `true`,
-/// so sqlparser tokenizes that as two minus operators and fails. We turn
-/// every `--<EOL>` into `-- <EOL>`. Inside string literals, identifier
-/// quotes, and block comments the substitution is suppressed so we don't
-/// corrupt data.
+/// Two transformations:
+///
+/// 1. **Bare `--<EOL>`.** Real `mariadb-dump` output uses `--` on a line by
+///    itself as a separator. `MySqlDialect::requires_single_line_comment_whitespace`
+///    is `true`, so sqlparser tokenizes that as two minus operators. We
+///    inject a space after every bare `--` at end-of-line.
+///
+/// 2. **MySQL/MariaDB conditional comments** (`/*!N …*/`, `/*M!N …*/`).
+///    `mariadb-dump` wraps version-gated SQL inside these markers — to the
+///    real server they're statements to execute when its version meets the
+///    threshold; to a non-MariaDB tokenizer they're opaque block comments.
+///    We unwrap them: `/*!40101 SET NAMES latin1 */` becomes
+///    `         SET NAMES latin1   `. The marker characters are replaced
+///    by spaces of equal length so source line/column positions are
+///    preserved end-to-end. We also handle the bare `/*!` (no version
+///    digits) and the MariaDB-specific `/*M!` form.
+///
+/// Inside string literals, identifier quotes, and line comments the
+/// substitutions are suppressed so we don't corrupt data.
 fn preprocess_mariadb(sql: &str) -> String {
     let mut out = String::with_capacity(sql.len());
     let bytes = sql.as_bytes();
@@ -74,6 +86,54 @@ fn preprocess_mariadb(sql: &str) -> String {
                     i += 1;
                 }
                 b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'*' => {
+                    // Detect MariaDB/MySQL conditional comments:
+                    //   /*!NNN  ...*/    — MySQL conditional comment
+                    //   /*M!NNN ...*/    — MariaDB conditional comment
+                    //   /*!     ...*/    — unconditional MySQL extension
+                    //   /*M!    ...*/    — unconditional MariaDB extension
+                    let after = i + 2;
+                    let conditional = match bytes.get(after) {
+                        Some(b'!') => Some(after + 1),
+                        Some(b'M') if bytes.get(after + 1) == Some(&b'!') => Some(after + 2),
+                        _ => None,
+                    };
+                    if let Some(mut cursor) = conditional {
+                        // Find the matching `*/`. Conditional comments don't
+                        // nest in MariaDB-dump output, so a flat scan is fine.
+                        let mut end = None;
+                        let mut k = cursor;
+                        while k + 1 < bytes.len() {
+                            if bytes[k] == b'*' && bytes[k + 1] == b'/' {
+                                end = Some(k);
+                                break;
+                            }
+                            k += 1;
+                        }
+                        if let Some(end) = end {
+                            // Replace the `/*!N` (or `/*M!N`) with spaces so
+                            // column counts are preserved.
+                            for _ in i..cursor {
+                                out.push(' ');
+                            }
+                            // Skip past optional version digits.
+                            while cursor < end && bytes[cursor].is_ascii_digit() {
+                                out.push(' ');
+                                cursor += 1;
+                            }
+                            // Re-append the inner SQL verbatim (newlines etc
+                            // pass through).
+                            for &b in &bytes[cursor..end] {
+                                out.push(b as char);
+                            }
+                            // Replace closing `*/` with spaces.
+                            out.push(' ');
+                            out.push(' ');
+                            i = end + 2;
+                            continue;
+                        }
+                        // Unterminated — fall through to normal block-comment
+                        // handling so we don't lose data.
+                    }
                     out.push_str("/*");
                     state = State::BlockComment;
                     i += 2;
@@ -205,7 +265,18 @@ fn mariadb_with_fallback(
 /// recognize. Used purely for warning messages.
 fn classify_mariadb_raw(stmt: &str) -> String {
     let upper = stmt.to_ascii_uppercase();
-    let head = upper.trim_start();
+    let mut head = upper.trim_start();
+    // Peek through a leading conditional comment so the classifier sees the
+    // *inner* statement: `/*!40000 ALTER TABLE …DISABLE KEYS */` should
+    // classify on the ALTER TABLE, not on the comment marker.
+    if let Some(rest) = head
+        .strip_prefix("/*!")
+        .or_else(|| head.strip_prefix("/*M!"))
+    {
+        let rest = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+        let rest = rest.trim_start();
+        head = rest;
+    }
     if head.contains("WITH SYSTEM VERSIONING") || head.contains("PERIOD FOR SYSTEM_TIME") {
         return "system_versioning".to_string();
     }
@@ -229,6 +300,20 @@ fn classify_mariadb_raw(stmt: &str) -> String {
         || head.starts_with("CREATE PROCEDURE")
     {
         return "stored_program_body".to_string();
+    }
+    if head.starts_with("ALTER TABLE")
+        && (head.contains(" DISABLE KEYS") || head.contains(" ENABLE KEYS"))
+    {
+        return "optimization_hint".to_string();
+    }
+    if head.starts_with("CREATE DEFINER=")
+        || head.starts_with("CREATE ALGORITHM=")
+        || head.contains(" DEFINER=`")
+    {
+        return "definer_clause".to_string();
+    }
+    if head.starts_with("CREATE EVENT") {
+        return "create_event".to_string();
     }
     "unrepresented".to_string()
 }

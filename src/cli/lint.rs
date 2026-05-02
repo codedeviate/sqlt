@@ -52,7 +52,12 @@ pub fn run(args: LintArgs) -> Result<()> {
         .cloned()
         .collect();
 
-    let output = format::render(args.format, &source_label, &sql, &displayed)?;
+    let help_mode = if args.no_help {
+        format::HelpMode::Never
+    } else {
+        args.help_mode.into()
+    };
+    let output = format::render_with(args.format, &source_label, &sql, &displayed, help_mode)?;
     print!("{output}");
 
     if any_at_threshold {

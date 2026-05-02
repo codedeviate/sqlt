@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-fragment AST line numbers are now rebased to the original file's line space. The MariaDB fallback path prepends `start_line - 1` newlines to each fragment before re-parsing, so every `Location.line` in the resulting AST refers to the actual source file (e.g. lint findings on a `CREATE TABLE` at file line 17981 now report `17981`, not `1`).
 - DDL rules (`SQLT0801 float-for-money`, `SQLT0802 varchar-without-length`) now attach diagnostics to the column's identifier span (`col.name.span`) rather than the statement span. `Statement::CreateTable` has no `Spanned` impl upstream, so the previous span fell back to `1:1`; the column-name span is always populated.
 
+### Changed
+- Text-format `help:` lines are deduplicated by default. The same suggestion is emitted only once per `(rule_id, suggestion)` pair within a render — for SQLT0001 with hundreds of identical raw-passthrough findings the help shows once at the first occurrence. Output volume on a 7 MB MariaDB dump dropped from 1371 lines to 688 (~50%) with no information lost.
+
+### Added
+- `--help-mode auto|always|never` flag on `sqlt lint` controlling text-format help rendering. `auto` (default) deduplicates per `(rule_id, suggestion)`. `always` restores the per-finding rendering. `never` suppresses help entirely.
+- `--no-help` flag as a shorthand for `--help-mode never`.
+
 ### Removed
 - `src/dialect/mariadb.rs` (the `MariaDbDialect` wrapper struct). It was the source of the silent feature-flag disablement above. MariaDB-specific parser tweaks now live in `src/parse/mod.rs::preprocess_mariadb`.
 

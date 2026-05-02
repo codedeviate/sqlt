@@ -101,6 +101,24 @@ pub enum ExitOn {
     Info,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+#[clap(rename_all = "kebab-case")]
+pub enum CliHelpMode {
+    Auto,
+    Always,
+    Never,
+}
+
+impl From<CliHelpMode> for crate::lint::format::HelpMode {
+    fn from(m: CliHelpMode) -> Self {
+        match m {
+            CliHelpMode::Auto => Self::Auto,
+            CliHelpMode::Always => Self::Always,
+            CliHelpMode::Never => Self::Never,
+        }
+    }
+}
+
 #[derive(Debug, clap::Args)]
 pub struct LintArgs {
     /// Source SQL dialect (required unless --explain is given).
@@ -114,6 +132,17 @@ pub struct LintArgs {
     /// Output format.
     #[arg(long, value_enum, default_value_t = LintFormat::Text)]
     pub format: LintFormat,
+
+    /// How to render `help:` lines in text format.
+    /// `auto` (default): show once per (rule, suggestion) pair.
+    /// `always`: show under every diagnostic.
+    /// `never`: suppress entirely.
+    #[arg(long = "help-mode", value_enum, default_value_t = CliHelpMode::Auto)]
+    pub help_mode: CliHelpMode,
+
+    /// Shorthand for `--help-mode never`.
+    #[arg(long = "no-help", conflicts_with = "help_mode")]
+    pub no_help: bool,
 
     /// Enable a rule (repeatable). Accepts SQLT0500, 0500, 500, or slug.
     #[arg(long = "rule")]

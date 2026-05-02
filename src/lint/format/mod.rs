@@ -3,6 +3,8 @@ pub mod pretty;
 pub mod sarif;
 pub mod text;
 
+pub use text::HelpMode;
+
 use crate::error::Result;
 use crate::lint::Diagnostic;
 
@@ -21,8 +23,18 @@ pub fn render(
     source_text: &str,
     diagnostics: &[Diagnostic],
 ) -> Result<String> {
+    render_with(format, source, source_text, diagnostics, HelpMode::Auto)
+}
+
+pub fn render_with(
+    format: Format,
+    source: &str,
+    source_text: &str,
+    diagnostics: &[Diagnostic],
+    help: HelpMode,
+) -> Result<String> {
     Ok(match format {
-        Format::Text => text::render(source, diagnostics),
+        Format::Text => text::render_with(source, diagnostics, help),
         Format::Pretty => pretty::render(source, source_text, diagnostics),
         Format::Json => json::render(source, diagnostics),
         Format::Sarif => sarif::render(source, diagnostics),

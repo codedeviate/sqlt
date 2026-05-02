@@ -23,6 +23,13 @@ sqlt parse --from postgres schema.sql | sqlt emit --to mysql
 
 # Translate SQL between dialects
 sqlt translate --from mariadb --to postgres input.sql
+
+# Lint SQL for common pitfalls and improvement suggestions
+sqlt lint --from mariadb schema.sql
+sqlt lint --from mariadb --to postgres schema.sql        # adds translation pre-flight checks
+sqlt lint --from mariadb --format json schema.sql        # JSON output
+sqlt lint --from mariadb --format sarif schema.sql       # SARIF for GitHub code scanning
+sqlt lint --explain SQLT0300                             # rule documentation
 ```
 
 Reads from a file path or stdin (use `-` or omit the path).
@@ -48,6 +55,26 @@ Supported encodings: `utf-8` (default), `iso-8859-1` / `latin1`, `windows-1252` 
 ### Translation gaps
 
 When a construct has no faithful equivalent in the target dialect (e.g. translating `RETURNING` to MySQL), `sqlt translate` emits the closest equivalent and prints a warning to stderr. Pass `--strict` to make any warning a non-zero exit.
+
+### Lint
+
+`sqlt lint` runs ~38 rules across seven categories: dialect cross-contamination, translation pre-flight (when `--to` is set), join hygiene, subquery improvements, performance pitfalls, correctness pitfalls, style/readability, and DDL hygiene. Every rule has a stable id (`SQLT0500`), a slug (`select-star`), and inline documentation (`sqlt lint --explain SQLT0500`).
+
+Common flags:
+
+```
+--from <dialect>          required; the source SQL dialect
+--to   <dialect>          optional; enables translation pre-flight rules
+--format text|pretty|json|sarif      output format (default text)
+--rule <id>...            enable a specific rule (repeatable)
+--no-rule <id>...         disable a specific rule (repeatable)
+--severity error|warning|info        filter the output (rules still run)
+--exit-on  error|warning|info        controls exit code 1 (default error)
+--explain <id>            print rule documentation and exit 0
+-e, --encoding            same encoding handling as parse/translate
+```
+
+Exit codes match the rest of the CLI: `0` clean, `1` lint findings at or above `--exit-on` (or a parse error), `2` usage error, `3` reserved.
 
 ## Development
 

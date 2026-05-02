@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-02
+
 ### Added
 - `--encoding`/`-e` flag on `parse`, `emit`, and `translate` for non-UTF-8 input/output. Supported values: `utf-8` (default), `iso-8859-1` (alias `latin1`), `windows-1252` (alias `cp1252`). Decoding is strict — invalid byte sequences are rejected with exit code 1 rather than substituted with `U+FFFD`. JSON I/O is always UTF-8 (per spec); the flag governs SQL bytes only.
 - `Encoding` type in `src/encoding.rs` wrapping `encoding_rs` with strict decode/encode semantics and aliases.
 - CLI tests for Latin-1 round-trip (high-bit byte preservation through `translate`), default-mode rejection of non-UTF-8 input, and unknown-encoding exit code.
+- `sqlt lint` subcommand with 38 active rules across 8 categories: raw passthrough, dialect cross-contamination, translation pre-flight (driven by `dialect/caps.rs` when `--to` is set), join hygiene, subquery improvements, performance pitfalls, correctness pitfalls, style/readability, and DDL hygiene. Every rule has a stable id (`SQLT0500`), a slug (`select-star`), inline summary + long-form explanation accessible via `sqlt lint --explain`, and per-rule fixtures under `tests/fixtures/lint/`.
+- Four lint output formats: `text` (default, single-line grep-friendly), `pretty` (grouped per file with snippet pointer and inline rule explanation on first occurrence), `json`, and SARIF 2.1.0 for GitHub code-scanning integration.
+- Lint CLI flags: `--rule`/`--no-rule` (repeatable, accept full id / short numeric / slug), `--severity` (output filter), `--exit-on` (exit-code threshold, default `error`), `--explain <id>` (print rule docs and exit 0).
+- Lint architecture: `Rule` trait whose implementors register only the AST-shape callbacks they need; a shared driver in `src/lint/walk.rs` does one traversal per statement (sqlparser's `Visitor` doesn't fire on `Select`, so the driver does manual descent into `SetExpr::Select`/`TableWithJoins`). `check_query` receives a depth parameter so rules like `SQLT0403 order-by-in-subquery-without-limit` only fire on nested queries.
+- `tests/lint.rs` per-rule fixture walker plus `insta` snapshot tests for json/sarif output.
 
 ## [0.1.0] - 2026-05-02
 
@@ -35,5 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The `statements` field of the JSON envelope is now `Vec<SqltStatement>` instead of `Vec<Statement>`. For typed statements the on-the-wire shape is unchanged thanks to `#[serde(untagged)]`; only raw fallback fragments introduce a new shape.
 
-[Unreleased]: https://github.com/thomasbjork/sqlt/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/thomasbjork/sqlt/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/thomasbjork/sqlt/releases/tag/v0.2.0
 [0.1.0]: https://github.com/thomasbjork/sqlt/releases/tag/v0.1.0

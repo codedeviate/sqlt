@@ -36,6 +36,14 @@ The intent is to upstream typed AST support for these to `apache/datafusion-sqlp
 - Comment preservation across translation (round-trip within one dialect preserves them via raw-SQL fallback; cross-dialect drops them).
 - Index / constraint name normalization.
 
+### Lint
+- `.sqlt.toml` config file. v1 is CLI-flag-driven only. When this lands, the planned shape is `[lint] disabled = ["SQLT0500"]` and `[lint] severity = { SQLT0500 = "warning" }` overrides.
+- `SQLT0700` keyword-case-mixed — sqlparser strips raw token case in the AST; the rule cannot be implemented without re-tokenizing the source. We deliberately do *not* register this rule so `--rule SQLT0700` returns "unknown rule" rather than silently doing nothing.
+- Schema-aware semantic checks. The linter knows nothing about column types, indexes, NOT NULL constraints, foreign keys, etc. Rules with ⚠ in their `--explain` text rely on heuristics that produce false positives.
+- Auto-fix / fix mode. v1 reports only.
+- Per-line `-- sqlt:disable SQLT0500` suppression comments.
+- Per-rule severity overrides on the CLI (`--rule SQLT0500=warning` style).
+
 ### Encodings
 - UTF-16 (LE/BE) input/output and BOM detection.
 - Auto-detection of input encoding (`chardetng` integration). Today the user must pass `--encoding` explicitly; we deliberately don't guess because heuristic detection silently corrupts data on short inputs.

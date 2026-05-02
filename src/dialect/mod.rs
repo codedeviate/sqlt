@@ -1,5 +1,4 @@
 pub mod caps;
-pub mod mariadb;
 
 use std::str::FromStr;
 
@@ -21,10 +20,25 @@ pub enum DialectId {
 }
 
 impl DialectId {
+    /// Map a `DialectId` to the upstream `sqlparser` dialect used to parse it.
+    ///
+    /// MariaDB intentionally returns `MySqlDialect`. We previously used a
+    /// thin `MariaDbDialect` wrapper, but sqlparser gates many MySQL-only
+    /// features (`ON UPDATE` timestamp column option, table hints, `LIMIT a, b`
+    /// shorthand, etc.) behind `dialect_of!(MySqlDialect)` macros that
+    /// downcast via `Any`. Any wrapper type, however faithful in trait
+    /// forwarding, fails those `is::<MySqlDialect>()` checks and silently
+    /// loses dozens of MySQL-superset features that MariaDB needs. Using
+    /// `MySqlDialect` directly is the only reliable way to get the full
+    /// MariaDB grammar parsed today; the application-level distinction is
+    /// preserved via this `DialectId` enum.
+    ///
+    /// MariaDB input is pre-processed by `parse::parse` to handle the bare
+    /// `--<EOL>` comment form that real `mariadb-dump` output contains.
     pub fn upstream(self) -> Box<dyn Dialect> {
         match self {
             DialectId::MySql => Box::new(MySqlDialect {}),
-            DialectId::MariaDb => Box::new(mariadb::MariaDbDialect::new()),
+            DialectId::MariaDb => Box::new(MySqlDialect {}),
             DialectId::Postgres => Box::new(PostgreSqlDialect {}),
             DialectId::MsSql => Box::new(MsSqlDialect {}),
             DialectId::Sqlite => Box::new(SQLiteDialect {}),

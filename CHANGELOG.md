@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- MariaDB parsing now uses `MySqlDialect` directly instead of a forwarding wrapper. The wrapper failed `dialect_of!(MySqlDialect)` downcast checks scattered through sqlparser, which silently disabled MySQL-superset features that real MariaDB grammar relies on (`ON UPDATE` timestamp column option, table hints, `LIMIT a, b`, `LOCK/UNLOCK TABLES`, etc.). Real-world `mariadb-dump` output now parses to typed AST instead of falling back to raw passthrough — verified on a 73 KB production schema where 49 raw fragments collapsed to 17 (only legitimately-tricky DELIMITER directives and stored-program bodies remain).
+- MariaDB inputs are pre-processed to inject a space after bare `--` at end-of-line. `mariadb-dump` emits `--` on a line by itself; sqlparser tokenized that as two minus operators because `MySqlDialect::requires_single_line_comment_whitespace` is `true`. The preprocessor tracks string-literal / quoted-identifier / block-comment / line-comment state so the substitution never corrupts data.
+- `RawStatement` carries a `start_line` so SQLT0001 (raw-passthrough) lint diagnostics report the actual source line of each fragment instead of all firing at `1:1`. The field is metadata only — `PartialEq` for `RawStatement` ignores it so round-trip parse → emit → parse still produces equal ASTs.
+- Raw classifier recognises `delimiter` and `stored_program_body` (CREATE TRIGGER/FUNCTION/PROCEDURE) reasons so the diagnostic message is more actionable.
+
+### Removed
+- `src/dialect/mariadb.rs` (the `MariaDbDialect` wrapper struct). It was the source of the silent feature-flag disablement above. MariaDB-specific parser tweaks now live in `src/parse/mod.rs::preprocess_mariadb`.
+
 ## [0.2.0] - 2026-05-02
 
 ### Added

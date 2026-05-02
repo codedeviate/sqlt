@@ -39,7 +39,7 @@ pub enum SqltStatement {
 /// from a `Statement` variant — `Statement` always serializes as a single
 /// upper-camel-case key (e.g. `{"Insert": {...}}`), whereas `RawStatement`
 /// carries the marker key `sqlt_raw`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawStatement {
     /// The original SQL text (excluding the trailing `;`).
     pub sqlt_raw: String,
@@ -47,6 +47,22 @@ pub struct RawStatement {
     /// `"create_package"`, `"sequence_option_order"`. Used by `translate` to
     /// build a useful warning message.
     pub reason: String,
+    /// 1-based line of the first non-whitespace character of `sqlt_raw`
+    /// in the original input. Used by lint diagnostics so SQLT0001 reports
+    /// the actual location instead of `1:1` for every raw fragment. `None`
+    /// when the parser couldn't compute it (rare).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_line: Option<u64>,
+}
+
+/// `start_line` is metadata about *where* the fragment came from, not part
+/// of its semantic content. Round-trip equality (parse → emit → parse) only
+/// compares the SQL itself and the reason tag, so two equivalent raw
+/// fragments at different source positions still compare equal.
+impl PartialEq for RawStatement {
+    fn eq(&self, other: &Self) -> bool {
+        self.sqlt_raw == other.sqlt_raw && self.reason == other.reason
+    }
 }
 
 impl SqltStatement {

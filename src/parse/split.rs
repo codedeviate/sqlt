@@ -7,10 +7,27 @@
 //! line/block comments so that a `;` inside one of those is not mistaken
 //! for a statement terminator.
 
-/// Split `sql` on top-level `;` boundaries.
+/// Split `sql` on top-level `;` boundaries. Discards line tracking; use
+/// [`split_statements_with_lines`] when you need to attribute each piece to
+/// its source location. Used in tests; the parse path uses the with-lines
+/// variant directly so source positions survive into raw fragments.
+#[cfg(test)]
 pub fn split_statements(sql: &str) -> Vec<String> {
-    let mut out = Vec::new();
+    split_statements_with_lines(sql)
+        .into_iter()
+        .map(|(_, s)| s)
+        .collect()
+}
+
+/// Split `sql` and tag each piece with the 1-based line of its first
+/// character. Lines after a piece-internal newline still belong to that
+/// piece — the line number is the *start*.
+pub fn split_statements_with_lines(sql: &str) -> Vec<(u64, String)> {
+    let mut out: Vec<(u64, String)> = Vec::new();
     let mut buf = String::new();
+    // Set on the first non-whitespace character that lands in `buf`.
+    let mut buf_start_line: Option<u64> = None;
+    let mut current_line: u64 = 1;
     let mut chars = sql.chars().peekable();
 
     enum State {
@@ -24,6 +41,14 @@ pub fn split_statements(sql: &str) -> Vec<String> {
     let mut state = State::Normal;
 
     while let Some(c) = chars.next() {
+        // Capture the line of the first non-whitespace character of the
+        // current piece — that's what users want to see in diagnostics.
+        if buf_start_line.is_none() && !c.is_whitespace() {
+            buf_start_line = Some(current_line);
+        }
+        if c == '\n' {
+            current_line += 1;
+        }
         match state {
             State::Normal => match c {
                 '\'' => {
@@ -49,7 +74,9 @@ pub fn split_statements(sql: &str) -> Vec<String> {
                     state = State::BlockComment;
                 }
                 ';' => {
-                    out.push(std::mem::take(&mut buf));
+                    let piece = std::mem::take(&mut buf);
+                    out.push((buf_start_line.unwrap_or(current_line), piece));
+                    buf_start_line = None;
                 }
                 _ => buf.push(c),
             },
@@ -92,7 +119,7 @@ pub fn split_statements(sql: &str) -> Vec<String> {
         }
     }
     if !buf.is_empty() {
-        out.push(buf);
+        out.push((buf_start_line.unwrap_or(current_line), buf));
     }
     out
 }
@@ -138,5 +165,16 @@ mod tests {
         let v = split_statements("SELECT 1;");
         let nonempty: Vec<_> = v.iter().filter(|s| !s.trim().is_empty()).collect();
         assert_eq!(nonempty.len(), 1);
+    }
+
+    #[test]
+    fn tags_pieces_with_their_starting_line() {
+        let v = split_statements_with_lines("SELECT 1;\n\nSELECT 2;\n  -- gap\n\nSELECT 3");
+        // Pieces: (line 1, "SELECT 1"), (line 3, "\n\nSELECT 2"), (line 4..., remainder).
+        assert!(v.len() >= 2);
+        assert_eq!(v[0].0, 1);
+        assert!(v[0].1.contains("SELECT 1"));
+        assert_eq!(v[1].0, 3);
+        assert!(v[1].1.contains("SELECT 2"));
     }
 }

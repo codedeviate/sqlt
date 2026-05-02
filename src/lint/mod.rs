@@ -33,7 +33,13 @@ pub fn lint(
     for (i, stmt) in stmts.iter().enumerate() {
         let stmt_span = match stmt {
             SqltStatement::Std(boxed) => walk::statement_span(boxed),
-            SqltStatement::Raw(_) => sqlparser::tokenizer::Span::empty(),
+            SqltStatement::Raw(r) => match r.start_line {
+                Some(line) => sqlparser::tokenizer::Span::new(
+                    sqlparser::tokenizer::Location { line, column: 1 },
+                    sqlparser::tokenizer::Location { line, column: 1 },
+                ),
+                None => sqlparser::tokenizer::Span::empty(),
+            },
         };
         let ctx = LintCtx {
             src,

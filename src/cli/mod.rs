@@ -53,11 +53,26 @@ Multi-dialect SQL parser, translator, and linter.
 
 Supported dialects:
  - mysql                                MySQL 5.7+ / 8.0
- - mariadb                              MariaDB (first-class; not aliased to MySQL)
+ - mariadb                              MariaDB — see note below
  - postgres (aliases: postgresql, pg)   PostgreSQL
  - mssql    (aliases: tsql, sqlserver)  Microsoft SQL Server / T-SQL
  - sqlite                               SQLite
  - generic                              Permissive fallback dialect
+
+About `--from mariadb`:
+ At the parser layer MariaDB uses sqlparser's MySqlDialect (a wrapper
+ fails the dialect_of!(MySqlDialect) downcast checks scattered through
+ sqlparser, silently disabling MySQL-superset features MariaDB needs).
+ MariaDB-specific behaviour lives one layer up:
+   - input preprocessor unwraps mariadb-dump conditional comments
+     (/*!NNN ... */, /*M!NNN ... */) and relaxes bare --<EOL>
+   - per-statement fallback wraps unparseable MariaDB syntax as
+     `Raw` fragments classified by reason (system_versioning,
+     create_package, optimization_hint, delimiter, ...)
+   - capability table treats MariaDB distinctly from MySQL for
+     RETURNING, CREATE SEQUENCE, system versioning, etc.
+   - lint rules can branch on the source dialect (e.g. SQLT0104
+     fires for --from mysql but not --from mariadb)
 
 Supported encodings (--encoding / -e):
  - utf-8         (default; always used for JSON I/O)

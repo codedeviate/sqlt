@@ -65,6 +65,8 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         // ddl
         Box::new(rules::ddl::FloatForMoney),
         Box::new(rules::ddl::VarcharWithoutLength),
+        // schema-aware
+        Box::new(rules::schema_aware::UnknownColumn),
     ];
     v.sort_by_key(|r| r.meta().id);
     v

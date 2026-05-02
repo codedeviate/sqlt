@@ -4,6 +4,7 @@ pub mod format;
 pub mod registry;
 pub mod rule;
 pub mod rules;
+pub mod schema;
 pub mod walk;
 
 pub use diagnostic::Diagnostic;
@@ -29,6 +30,7 @@ pub fn lint(
     opts: &LintOptions,
 ) -> Result<Vec<Diagnostic>> {
     let rules = registry::select_rules(&opts.enable, &opts.disable)?;
+    let schema = schema::Schema::from_statements(stmts);
     let mut diagnostics = Vec::new();
     for (i, stmt) in stmts.iter().enumerate() {
         let stmt_span = match stmt {
@@ -47,6 +49,7 @@ pub fn lint(
             stmt_index: i,
             stmt_span,
             source_text,
+            schema: &schema,
         };
         walk::walk_statement(stmt, &rules, &ctx, &mut diagnostics);
     }

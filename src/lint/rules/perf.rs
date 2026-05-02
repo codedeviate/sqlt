@@ -294,8 +294,10 @@ const META_COUNT_COL: RuleMeta = RuleMeta {
     summary: "`COUNT(col)` skips NULL values; `COUNT(*)` counts every row.",
     explanation: "If the intent is `how many rows`, use `COUNT(*)` (or `COUNT(1)`). If the intent \
                   is `how many rows have a non-NULL value in this column`, keep `COUNT(col)` and \
-                  consider adding a comment so the next reader knows it's deliberate. Schema-blind: \
-                  the linter doesn't know if the column is declared NOT NULL.",
+                  consider adding a comment so the next reader knows it's deliberate. \
+                  Schema-aware: when a `CREATE TABLE` for the referenced column is present in \
+                  the same input AND the column is declared `NOT NULL`, the rule is suppressed \
+                  because COUNT(col) and COUNT(*) are guaranteed equal.",
 };
 
 impl Rule for CountOfNullableColumn {
@@ -315,17 +317,67 @@ impl Rule for CountOfNullableColumn {
         if list.args.len() != 1 {
             return;
         }
-        if let FunctionArg::Unnamed(FunctionArgExpr::Expr(inner)) = &list.args[0]
-            && matches!(inner, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
-        {
-            out.push(simple_diag(
-                &META_COUNT_COL,
-                ctx,
-                "COUNT(col) skips NULL values; if you want all rows use COUNT(*)",
-                Some("use COUNT(*) for `how many rows`, COUNT(col) only when filtering NULLs is intentional".into()),
-                expr_span(expr).unwrap_or(ctx.stmt_span),
-            ));
+        let FunctionArg::Unnamed(FunctionArgExpr::Expr(inner)) = &list.args[0] else {
+            return;
+        };
+        let Some((table, column)) = extract_column_ref(inner) else {
+            return;
+        };
+        // Schema-aware suppression: if we know the column is NOT NULL,
+        // COUNT(col) and COUNT(*) are equivalent and the warning is noise.
+        if let Some(t) = table.as_deref() {
+            if let Some(c) = ctx.schema.column(t, &column)
+                && !c.nullable
+            {
+                return;
+            }
+        } else {
+            // Unqualified — skip if any known table has this column declared NOT NULL.
+            // Conservative: only suppress when EVERY known table that has this column
+            // declares it NOT NULL, otherwise we might miss a real issue.
+            let mut tables_with_col = 0usize;
+            let mut all_not_null = true;
+            for tbl in ctx.schema.tables_iter() {
+                if let Some(c) = tbl.columns.get(&column.to_ascii_lowercase()) {
+                    tables_with_col += 1;
+                    if c.nullable {
+                        all_not_null = false;
+                    }
+                }
+            }
+            if tables_with_col > 0 && all_not_null {
+                return;
+            }
         }
+        out.push(simple_diag(
+            &META_COUNT_COL,
+            ctx,
+            "COUNT(col) skips NULL values; if you want all rows use COUNT(*)",
+            Some(
+                "use COUNT(*) for `how many rows`, COUNT(col) only when filtering NULLs is intentional"
+                    .into(),
+            ),
+            expr_span(expr).unwrap_or(ctx.stmt_span),
+        ));
+    }
+}
+
+/// Pull (Some(table), column) or (None, column) out of a column-reference expression.
+fn extract_column_ref(e: &Expr) -> Option<(Option<String>, String)> {
+    match e {
+        Expr::Identifier(i) => Some((None, i.value.clone())),
+        Expr::CompoundIdentifier(parts) => {
+            // [db, table, col], [table, col], or [col]
+            let n = parts.len();
+            if n >= 2 {
+                Some((Some(parts[n - 2].value.clone()), parts[n - 1].value.clone()))
+            } else if n == 1 {
+                Some((None, parts[0].value.clone()))
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
 }
 

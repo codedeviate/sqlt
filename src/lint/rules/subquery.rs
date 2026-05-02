@@ -19,9 +19,9 @@ const META_NOT_IN: RuleMeta = RuleMeta {
     summary: "`NOT IN (SELECT ...)` returns no rows if the subquery yields any NULL.",
     explanation: "SQL three-valued logic strikes again. `x NOT IN (1, NULL)` evaluates to UNKNOWN \
                   for every x, not TRUE. Prefer `NOT EXISTS (SELECT 1 ... WHERE col = outer.x)`. \
-                  Note: this is a heuristic — without schema info the linter cannot prove the inner \
-                  column is NOT NULL. The diagnostic fires on every NOT IN subquery so reviewers can \
-                  confirm.",
+                  Schema-aware: when a `CREATE TABLE` for the inner subquery's projected column \
+                  is present in the same input AND that column is declared `NOT NULL`, the \
+                  warning is suppressed because the NULL pitfall cannot trigger.",
 };
 
 impl Rule for NotInSubqueryNullPitfall {
@@ -29,16 +29,75 @@ impl Rule for NotInSubqueryNullPitfall {
         &META_NOT_IN
     }
     fn check_expr(&self, expr: &Expr, ctx: &LintCtx, out: &mut Vec<Diagnostic>) {
-        if let Expr::InSubquery { negated: true, .. } = expr {
-            out.push(diagnostic(
-                &META_NOT_IN,
-                ctx,
-                "NOT IN (SELECT ...) returns no rows if the subquery yields any NULL",
-                Some("rewrite as `NOT EXISTS (SELECT 1 ... WHERE col = outer.col)`".into()),
-                expr_span(expr).unwrap_or(ctx.stmt_span),
-            ));
+        let Expr::InSubquery {
+            negated: true,
+            subquery,
+            ..
+        } = expr
+        else {
+            return;
+        };
+        // Schema-aware suppression: if the subquery selects a single column
+        // that resolves to a known NOT NULL column, NULL can't appear.
+        if subquery_projects_not_null(subquery, ctx) {
+            return;
         }
+        out.push(diagnostic(
+            &META_NOT_IN,
+            ctx,
+            "NOT IN (SELECT ...) returns no rows if the subquery yields any NULL",
+            Some("rewrite as `NOT EXISTS (SELECT 1 ... WHERE col = outer.col)`".into()),
+            expr_span(expr).unwrap_or(ctx.stmt_span),
+        ));
     }
+}
+
+/// Returns true if the subquery projects exactly one column reference whose
+/// schema-declared type is NOT NULL. Conservative: any other shape returns
+/// false (and the warning fires).
+fn subquery_projects_not_null(q: &Query, ctx: &LintCtx) -> bool {
+    if ctx.schema.is_empty() {
+        return false;
+    }
+    let SetExpr::Select(s) = q.body.as_ref() else {
+        return false;
+    };
+    if s.projection.len() != 1 {
+        return false;
+    }
+    let inner = match &s.projection[0] {
+        SelectItem::UnnamedExpr(e) | SelectItem::ExprWithAlias { expr: e, .. } => e,
+        _ => return false,
+    };
+    // Resolve the projected column to a (table, column) using the FROM
+    // clause's table, if exactly one is present.
+    let from_table = if s.from.len() == 1 && s.from[0].joins.is_empty() {
+        match &s.from[0].relation {
+            sqlparser::ast::TableFactor::Table { name, .. } => {
+                name.0.last().and_then(|p| match p {
+                    sqlparser::ast::ObjectNamePart::Identifier(i) => Some(i.value.clone()),
+                    _ => None,
+                })
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let (table, column) = match inner {
+        Expr::Identifier(i) => match &from_table {
+            Some(t) => (t.clone(), i.value.clone()),
+            None => return false,
+        },
+        Expr::CompoundIdentifier(parts) if parts.len() >= 2 => (
+            parts[parts.len() - 2].value.clone(),
+            parts[parts.len() - 1].value.clone(),
+        ),
+        _ => return false,
+    };
+    ctx.schema
+        .column(&table, &column)
+        .is_some_and(|c| !c.nullable)
 }
 
 // ───────────────────────────── SQLT0401 in-subquery-prefer-exists ───────────

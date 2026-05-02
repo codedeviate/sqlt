@@ -61,6 +61,9 @@ pub enum Category {
     Correctness,
     Style,
     Ddl,
+    /// Schema-aware rules — fire only when a `CREATE TABLE` for the
+    /// referenced object exists in the same input.
+    Schema,
 }
 
 impl Category {
@@ -75,6 +78,7 @@ impl Category {
             Category::Correctness => "correctness",
             Category::Style => "style",
             Category::Ddl => "ddl",
+            Category::Schema => "schema",
         }
     }
 }

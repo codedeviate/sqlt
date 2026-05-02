@@ -420,7 +420,7 @@ expression: normalised
                 "level": "warning"
               },
               "fullDescription": {
-                "text": "SQL three-valued logic strikes again. `x NOT IN (1, NULL)` evaluates to UNKNOWN for every x, not TRUE. Prefer `NOT EXISTS (SELECT 1 ... WHERE col = outer.x)`. Note: this is a heuristic — without schema info the linter cannot prove the inner column is NOT NULL. The diagnostic fires on every NOT IN subquery so reviewers can confirm."
+                "text": "SQL three-valued logic strikes again. `x NOT IN (1, NULL)` evaluates to UNKNOWN for every x, not TRUE. Prefer `NOT EXISTS (SELECT 1 ... WHERE col = outer.x)`. Schema-aware: when a `CREATE TABLE` for the inner subquery's projected column is present in the same input AND that column is declared `NOT NULL`, the warning is suppressed because the NULL pitfall cannot trigger."
               },
               "id": "SQLT0400",
               "name": "not-in-subquery-null-pitfall",
@@ -610,7 +610,7 @@ expression: normalised
                 "level": "note"
               },
               "fullDescription": {
-                "text": "If the intent is `how many rows`, use `COUNT(*)` (or `COUNT(1)`). If the intent is `how many rows have a non-NULL value in this column`, keep `COUNT(col)` and consider adding a comment so the next reader knows it's deliberate. Schema-blind: the linter doesn't know if the column is declared NOT NULL."
+                "text": "If the intent is `how many rows`, use `COUNT(*)` (or `COUNT(1)`). If the intent is `how many rows have a non-NULL value in this column`, keep `COUNT(col)` and consider adding a comment so the next reader knows it's deliberate. Schema-aware: when a `CREATE TABLE` for the referenced column is present in the same input AND the column is declared `NOT NULL`, the rule is suppressed because COUNT(col) and COUNT(*) are guaranteed equal."
               },
               "id": "SQLT0505",
               "name": "count-of-nullable-column",
@@ -869,6 +869,25 @@ expression: normalised
               },
               "shortDescription": {
                 "text": "`VARCHAR` without an explicit length means different things across dialects."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Schema-aware rule. Only fires when:\n  * the referenced table is declared via `CREATE TABLE` in the same input,\n  * the reference is qualified (`table.col`, not bare `col`),\n  * the named column is not present on that table.\nConservative on purpose — it never warns about CTEs, derived-table aliases, or tables defined elsewhere. Catches typos and stale references in queries that ship alongside their schema."
+              },
+              "id": "SQLT0900",
+              "name": "unknown-column",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "schema"
+                ]
+              },
+              "shortDescription": {
+                "text": "A column reference of the form `table.col` does not exist on the table's CREATE TABLE."
               }
             }
           ],

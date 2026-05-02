@@ -5,5 +5,6 @@ pub mod joins;
 pub mod perf;
 pub mod pre_flight;
 pub mod raw;
+pub mod schema_aware;
 pub mod style;
 pub mod subquery;

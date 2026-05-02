@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Schema-aware lint pass.** `lint::lint` now builds a `Schema` model from every `CREATE TABLE` statement in the input before running rules and passes it to each rule via `LintCtx::schema`. Lookups are case-insensitive; `NOT NULL` and `PRIMARY KEY` are tracked per column.
+- New rule **SQLT0900 unknown-column** (Schema category, error, default-on). Fires when a `table.col` reference resolves to a `CREATE TABLE` in the same input but the column doesn't exist on that table. Also catches typos in the `INSERT INTO Foo (col1, col2)` column list. Conservative — never warns about CTEs, derived-table aliases, or tables defined elsewhere.
+- New rule category `Schema` (`SQLT09xx` namespace) for rules that consult the schema model.
+
+### Changed
+- **SQLT0505 count-of-nullable-column** is now schema-aware: when a `CREATE TABLE` for the referenced column is present and the column is declared `NOT NULL`, the warning is suppressed (since `COUNT(col)` and `COUNT(*)` are guaranteed equivalent).
+- **SQLT0400 not-in-subquery-null-pitfall** is now schema-aware: when the inner subquery projects a single column that resolves to a known `NOT NULL` column, the warning is suppressed (the NULL pitfall cannot trigger).
+
 ### Fixed
 - MariaDB parsing now uses `MySqlDialect` directly instead of a forwarding wrapper. The wrapper failed `dialect_of!(MySqlDialect)` downcast checks scattered through sqlparser, which silently disabled MySQL-superset features that real MariaDB grammar relies on (`ON UPDATE` timestamp column option, table hints, `LIMIT a, b`, `LOCK/UNLOCK TABLES`, etc.). Real-world `mariadb-dump` output now parses to typed AST instead of falling back to raw passthrough — verified on a 73 KB production schema where 49 raw fragments collapsed to 17 (only legitimately-tricky DELIMITER directives and stored-program bodies remain).
 - MariaDB inputs are pre-processed to inject a space after bare `--` at end-of-line. `mariadb-dump` emits `--` on a line by itself; sqlparser tokenized that as two minus operators because `MySqlDialect::requires_single_line_comment_whitespace` is `true`. The preprocessor tracks string-literal / quoted-identifier / block-comment / line-comment state so the substitution never corrupts data.

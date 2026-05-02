@@ -27,7 +27,7 @@ The intent is to upstream typed AST support for these to `apache/datafusion-sqlp
 
 ### Parsing depth
 - Stored procedure / function / trigger bodies parsed beyond statement boundaries (currently treated as opaque blocks where the upstream parser does so).
-- Schema-aware semantic checks (table/column existence, type checking) — out of scope; this is a parser/translator, not a linter.
+- Schema-aware semantic checks beyond what `sqlt lint` already does (column existence in known tables, NOT NULL inference for COUNT/NOT-IN). The lint module derives a single-file schema from `CREATE TABLE` statements; it does not yet support `--schema <file>` for external schemas, foreign-key tracing, index awareness, or full type checking on every comparison. See "Lint" below for what's already shipped.
 - Query plan analysis or optimization hints rewriting.
 
 ### Translation
@@ -39,7 +39,8 @@ The intent is to upstream typed AST support for these to `apache/datafusion-sqlp
 ### Lint
 - `.sqlt.toml` config file. v1 is CLI-flag-driven only. When this lands, the planned shape is `[lint] disabled = ["SQLT0500"]` and `[lint] severity = { SQLT0500 = "warning" }` overrides.
 - `SQLT0700` keyword-case-mixed — sqlparser strips raw token case in the AST; the rule cannot be implemented without re-tokenizing the source. We deliberately do *not* register this rule so `--rule SQLT0700` returns "unknown rule" rather than silently doing nothing.
-- Schema-aware semantic checks. The linter knows nothing about column types, indexes, NOT NULL constraints, foreign keys, etc. Rules with ⚠ in their `--explain` text rely on heuristics that produce false positives.
+- Schema-aware features beyond the v0.3 baseline. Already shipped: a `Schema` model built from `CREATE TABLE` statements in the input, used by SQLT0900 (unknown-column) for typo detection, SQLT0505 (count-of-nullable-column) to suppress false positives on NOT NULL columns, and SQLT0400 (not-in-subquery-null-pitfall) likewise. **Still out of scope:** `--schema <file>` for an external schema, CREATE INDEX awareness (would refine SQLT0503 function-on-column), FOREIGN KEY tracing, full type checking on every comparison (a richer SQLT0506), CTE/VIEW expansion, ambiguous-column detection on multi-table joins, and unknown-table warnings (too many false positives without `--schema`).
+- Other ⚠ schema-blind heuristic rules (SQLT0506 implicit-string-numeric-compare, SQLT0503 function-on-column-in-where) still rely on heuristics that produce false positives. They are gated behind opt-in defaults until full schema awareness lands.
 - Auto-fix / fix mode. v1 reports only.
 - Per-line `-- sqlt:disable SQLT0500` suppression comments.
 - Per-rule severity overrides on the CLI (`--rule SQLT0500=warning` style).

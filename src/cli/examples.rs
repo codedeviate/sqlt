@@ -222,6 +222,34 @@ Examples:
   # Filter to errors only (warnings + info still run, just hidden)
   sqlt lint --from mysql --severity error schema.sql
 
+Schema-aware lint with --schema (real production workflow):
+
+  # Point at the bootstrap and migration files that build your real schema.
+  # Replays CREATE/ALTER/DROP TABLE, CREATE INDEX, FK constraints, and
+  # tracks USE/CREATE DATABASE for per-database namespacing.
+  sqlt lint --from mariadb \
+      --schema shop/bootstrap.sql --schema shop/migrations/*.sql \
+      query.sql
+
+  # Multi-database: same-named tables in different DBs do not collide.
+  sqlt lint --from mariadb \
+      --schema shop/bootstrap.sql \
+      --schema global/bootstrap.sql \
+      queries.sql
+
+  # Compile the schema once into a JSON artifact (`sqlt build-schema`),
+  # check it into the repo, lint against it on every PR.
+  sqlt build-schema --from mariadb \
+      --schema shop/bootstrap.sql --schema shop/migrations/*.sql \
+      -o shop_schema.json
+  sqlt lint --from mariadb --schema shop_schema.json query.sql
+
+  # Mix .json + late .sql migrations on top.
+  sqlt lint --from mariadb \
+      --schema shop_schema.json \
+      --schema shop/migrations/2026-05-12-add-col.sql \
+      query.sql
+
 Common workflow on a real production dump:
 
   # 1. See actionable findings (raw-passthrough hidden by default)
@@ -236,6 +264,59 @@ Common workflow on a real production dump:
   # 4. Pin to JSON for CI ingestion
   sqlt lint --from mariadb -e iso-8859-1 --format json --exit-on error \
       dump.sql > findings.json
+"#;
+
+pub const BUILD_SCHEMA: &str = r#"sqlt build-schema — compile a reusable schema artifact.
+
+Reads one or more `--schema` files (CREATE/ALTER/DROP TABLE, CREATE INDEX,
+CREATE DATABASE, USE, plus `mariadb-dump`-style noise), replays the DDL,
+and emits a JSON file that captures the *current* state of the schema.
+The artifact can be reloaded by `sqlt lint --schema schema.json` without
+re-parsing or re-replaying the original SQL.
+
+Use cases:
+
+  # Compile a long migration history once, lint many times.
+  sqlt build-schema --from mariadb \
+      --schema shop/bootstrap.sql \
+      --schema shop/migrations/*.sql \
+      -o shop_schema.json --pretty
+  sqlt lint --from mariadb --schema shop_schema.json query.sql
+
+  # Mix a compiled base with fresh migrations on every lint:
+  sqlt lint --from mariadb \
+      --schema shop_schema.json \
+      --schema shop/migrations/2026-05-12-add-col.sql \
+      query.sql
+
+  # Multi-database schemas (CREATE DATABASE / USE supported).
+  sqlt build-schema --from mariadb \
+      --schema shop/bootstrap.sql \
+      --schema global/bootstrap.sql \
+      -o combined.json
+  sqlt lint --from mariadb --schema combined.json queries.sql
+
+  # Schema files in Latin-1.
+  sqlt build-schema --from mariadb -e iso-8859-1 \
+      --schema dump.sql -o schema.json
+
+  # Stdout output (default if --output is omitted).
+  sqlt build-schema --from mysql --schema bootstrap.sql --pretty | jq '.'
+
+What's tracked:
+  - tables (per database; CREATE DATABASE / USE namespaces)
+  - columns (name, data type, nullable)
+  - indexes (named, unique, primary, fulltext, spatial; functional indexes
+    via the rendered SQL expression)
+  - primary keys
+  - foreign keys (resolved through the USE cursor)
+
+Statements that don't affect the schema (INSERT, GRANT, DELIMITER + stored
+program bodies, …) emit a `note: skipping <kind>` line on stderr but never
+error.
+
+The artifact carries the sqlt version it was built with — `lint` warns to
+stderr on major.minor mismatch but still tries to load.
 "#;
 
 pub fn print(text: &str) {

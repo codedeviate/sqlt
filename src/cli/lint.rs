@@ -1,5 +1,10 @@
-use crate::cli::{LintArgs, examples, read_input_text};
+use std::ffi::OsStr;
+use std::path::Path;
+
+use crate::cli::{LintArgs, examples, read_input_bytes, read_input_text};
+use crate::encoding::Encoding;
 use crate::error::{Error, Result};
+use crate::lint::schema::{Schema, SchemaSkip};
 use crate::lint::{self, LintOptions, Severity, format};
 use crate::parse;
 
@@ -40,6 +45,19 @@ pub fn run(args: LintArgs) -> Result<()> {
         _ => "<stdin>".to_string(),
     };
 
+    // Build the external schema by replaying every --schema file in CLI
+    // order. Files with a `.json` extension are loaded as a previously
+    // built artifact (from `sqlt build-schema`); everything else is
+    // parsed and replayed.
+    let mut schema = Schema::default();
+    let mut all_skips: Vec<SchemaSkip> = Vec::new();
+    for path in &args.schemas {
+        load_schema_file(path, from, args.encoding, &mut schema, &mut all_skips)?;
+    }
+    for s in &all_skips {
+        eprintln!("note: {}", s.render());
+    }
+
     let sql = read_input_text(args.input.as_deref(), args.encoding)?;
     let stmts = parse::parse(&sql, from)?;
 
@@ -51,7 +69,12 @@ pub fn run(args: LintArgs) -> Result<()> {
         enable,
         disable: args.no_rule.clone(),
     };
-    let mut diagnostics = lint::lint(&stmts, &sql, from, args.to, &opts)?;
+    let external = if args.schemas.is_empty() {
+        None
+    } else {
+        Some(schema)
+    };
+    let mut diagnostics = lint::lint(&stmts, &sql, from, args.to, &opts, external)?;
     lint::sort(&mut diagnostics);
 
     // Compute exit threshold against the *unfiltered* diagnostics so a
@@ -111,6 +134,49 @@ fn print_rule_list() {
     );
     println!();
     println!("Run `sqlt lint --explain <ID|SLUG>` for full documentation on any rule.");
+}
+
+/// Load a single `--schema` file into the running schema. Dispatches on
+/// extension: `.json` is a serialized `Schema` from `sqlt build-schema`;
+/// everything else is parsed and replayed.
+pub(crate) fn load_schema_file(
+    path: &Path,
+    from: crate::dialect::DialectId,
+    encoding: Encoding,
+    schema: &mut Schema,
+    skips: &mut Vec<SchemaSkip>,
+) -> Result<()> {
+    if path.extension().and_then(OsStr::to_str) == Some("json") {
+        let bytes = read_input_bytes(Some(path))?;
+        let raw = Encoding::Utf8.decode(&bytes)?;
+        let loaded: Schema = serde_json::from_str(&raw)?;
+        if !loaded.sqlt_version.is_empty() && !version_compatible(&loaded.sqlt_version) {
+            eprintln!(
+                "note: schema artifact at {} was built with sqlt {} (current {}); attempting to load anyway",
+                path.display(),
+                loaded.sqlt_version,
+                env!("CARGO_PKG_VERSION"),
+            );
+        }
+        schema.merge(&loaded);
+        return Ok(());
+    }
+    let text = read_input_text(Some(path), encoding)?;
+    let stmts = parse::parse(&text, from)?;
+    for stmt in &stmts {
+        schema.apply_statement(stmt, path, skips);
+    }
+    Ok(())
+}
+
+fn version_compatible(loaded: &str) -> bool {
+    // Match on major.minor — any patch difference is fine.
+    let cur = env!("CARGO_PKG_VERSION");
+    let take_two = |v: &str| -> Option<(String, String)> {
+        let mut parts = v.splitn(3, '.');
+        Some((parts.next()?.to_string(), parts.next()?.to_string()))
+    };
+    take_two(loaded) == take_two(cur)
 }
 
 /// `Severity` ordering: `Error < Warning < Info` per derive(Ord). To mean

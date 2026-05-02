@@ -16,7 +16,7 @@ use sqlt::parse;
 fn lint_text(sql: &str, source_label: &str, from: DialectId) -> String {
     let stmts = parse::parse(sql, from).expect("parse");
     let mut diagnostics =
-        lint::lint(&stmts, sql, from, None, &LintOptions::default()).expect("lint");
+        lint::lint(&stmts, sql, from, None, &LintOptions::default(), None).expect("lint");
     lint::sort(&mut diagnostics);
     format::render(format::Format::Text, source_label, sql, &diagnostics).expect("render")
 }
@@ -24,7 +24,7 @@ fn lint_text(sql: &str, source_label: &str, from: DialectId) -> String {
 fn lint_json(sql: &str, source_label: &str, from: DialectId) -> String {
     let stmts = parse::parse(sql, from).expect("parse");
     let mut diagnostics =
-        lint::lint(&stmts, sql, from, None, &LintOptions::default()).expect("lint");
+        lint::lint(&stmts, sql, from, None, &LintOptions::default(), None).expect("lint");
     lint::sort(&mut diagnostics);
     format::render(format::Format::Json, source_label, sql, &diagnostics).expect("render")
 }
@@ -32,7 +32,7 @@ fn lint_json(sql: &str, source_label: &str, from: DialectId) -> String {
 fn lint_sarif(sql: &str, source_label: &str, from: DialectId) -> String {
     let stmts = parse::parse(sql, from).expect("parse");
     let mut diagnostics =
-        lint::lint(&stmts, sql, from, None, &LintOptions::default()).expect("lint");
+        lint::lint(&stmts, sql, from, None, &LintOptions::default(), None).expect("lint");
     lint::sort(&mut diagnostics);
     format::render(format::Format::Sarif, source_label, sql, &diagnostics).expect("render")
 }
@@ -119,7 +119,7 @@ fn lint_fixture_walk() {
             let stmts = parse::parse(&sql, from)
                 .unwrap_or_else(|e| panic!("parse failed for {}: {e}", path.display()));
             let mut diagnostics =
-                lint::lint(&stmts, &sql, from, to, &LintOptions::default()).expect("lint");
+                lint::lint(&stmts, &sql, from, to, &LintOptions::default(), None).expect("lint");
             lint::sort(&mut diagnostics);
 
             let actual =

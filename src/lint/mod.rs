@@ -22,15 +22,41 @@ pub struct LintOptions {
 }
 
 /// Run the configured rules over a parsed batch.
+///
+/// `external_schema` is an optionally pre-built schema (typically loaded
+/// from `--schema <file>` arguments). When `Some`, it is used as the base
+/// and the input's CREATE TABLE statements augment it via `apply_statement`
+/// — preserving the v0.3 behaviour where inline CREATE TABLEs in the
+/// query file still feed the schema model. When `None`, behaviour is
+/// identical to today: the schema is built from the input's CREATE TABLE
+/// statements only.
 pub fn lint(
     stmts: &[SqltStatement],
     source_text: &str,
     src: DialectId,
     dst: Option<DialectId>,
     opts: &LintOptions,
+    external_schema: Option<schema::Schema>,
 ) -> Result<Vec<Diagnostic>> {
     let rules = registry::select_rules(&opts.enable, &opts.disable)?;
-    let schema = schema::Schema::from_statements(stmts);
+    let schema = match external_schema {
+        Some(mut s) => {
+            // Augment with CREATE TABLEs from the lint input itself, so a
+            // user with both --schema and inline CREATE TABLE in queries
+            // gets the union.
+            let synthetic = std::path::Path::new("<input>");
+            let mut throwaway_skips = Vec::new();
+            for stmt in stmts {
+                if let SqltStatement::Std(boxed) = stmt
+                    && matches!(&**boxed, sqlparser::ast::Statement::CreateTable(_))
+                {
+                    s.apply_statement(stmt, synthetic, &mut throwaway_skips);
+                }
+            }
+            s
+        }
+        None => schema::Schema::from_statements(stmts),
+    };
     let mut diagnostics = Vec::new();
     for (i, stmt) in stmts.iter().enumerate() {
         let stmt_span = match stmt {

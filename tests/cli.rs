@@ -246,6 +246,216 @@ fn lint_explain_prints_docs_and_exits_zero() {
 }
 
 #[test]
+fn lint_schema_flag_alter_drop_column_actually_drops_it() {
+    // Schema declares column `b`, then ALTER drops it. A query that
+    // references `t.b` must fire SQLT0900 because the schema's current
+    // state has only column `a`.
+    let tmp_schema = std::env::temp_dir().join("sqlt_schema_alter_drop.sql");
+    std::fs::write(
+        &tmp_schema,
+        "CREATE TABLE t (a INT, b INT); ALTER TABLE t DROP COLUMN b",
+    )
+    .expect("write schema");
+
+    let (stdout, _, code) = run(
+        sqlt().args([
+            "lint",
+            "--from",
+            "mysql",
+            "--schema",
+            tmp_schema.to_str().unwrap(),
+        ]),
+        "SELECT t.b FROM t",
+    );
+    assert_eq!(code, 1, "SQLT0900 should fire — column was dropped");
+    assert!(
+        stdout.contains("SQLT0900"),
+        "expected SQLT0900 in stdout: {stdout:?}"
+    );
+}
+
+#[test]
+fn lint_schema_unknown_statement_warns_to_stderr() {
+    let tmp = std::env::temp_dir().join("sqlt_schema_unknown.sql");
+    std::fs::write(&tmp, "INSERT INTO seed VALUES (1)").expect("write");
+
+    let (_, stderr, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--schema", tmp.to_str().unwrap()]),
+        "SELECT 1",
+    );
+    assert_eq!(code, 0);
+    assert!(
+        stderr.contains("note: skipping Insert"),
+        "stderr should include the skip note: {stderr:?}"
+    );
+}
+
+#[test]
+fn lint_schema_drop_missing_table_warns_not_errors() {
+    let tmp = std::env::temp_dir().join("sqlt_schema_drop_missing.sql");
+    std::fs::write(&tmp, "DROP TABLE nonexistent").expect("write");
+
+    let (_, stderr, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--schema", tmp.to_str().unwrap()]),
+        "SELECT 1",
+    );
+    assert_eq!(code, 0);
+    assert!(
+        stderr.contains("DROP TABLE on missing table"),
+        "got: {stderr:?}"
+    );
+}
+
+#[test]
+fn build_schema_then_lint_using_json_artifact() {
+    let tmp_sch = std::env::temp_dir().join("sqlt_bs_input.sql");
+    std::fs::write(
+        &tmp_sch,
+        "CREATE TABLE users (id INT NOT NULL); \
+         ALTER TABLE users ADD COLUMN email VARCHAR(255)",
+    )
+    .expect("write sch");
+    let tmp_json = std::env::temp_dir().join("sqlt_bs_artifact.json");
+
+    // Step 1: compile
+    let (_, stderr_build, code_build) = run(
+        sqlt().args([
+            "build-schema",
+            "--from",
+            "mysql",
+            "--schema",
+            tmp_sch.to_str().unwrap(),
+            "-o",
+            tmp_json.to_str().unwrap(),
+        ]),
+        "",
+    );
+    assert_eq!(code_build, 0, "build-schema failed: {stderr_build:?}");
+
+    // Step 2: lint using the artifact (no .sql replay needed)
+    let (_, _, code_clean) = run(
+        sqlt().args([
+            "lint",
+            "--from",
+            "mysql",
+            "--schema",
+            tmp_json.to_str().unwrap(),
+        ]),
+        "SELECT u.email FROM users u",
+    );
+    assert_eq!(code_clean, 0, "email should resolve from the artifact");
+
+    // Step 3: typo gets caught
+    let (stdout, _, code_typo) = run(
+        sqlt().args([
+            "lint",
+            "--from",
+            "mysql",
+            "--schema",
+            tmp_json.to_str().unwrap(),
+        ]),
+        "SELECT u.bogus FROM users u",
+    );
+    assert_eq!(code_typo, 1);
+    assert!(stdout.contains("SQLT0900"), "got: {stdout:?}");
+}
+
+#[test]
+fn build_schema_then_lint_with_late_sql_migration() {
+    let tmp_sch = std::env::temp_dir().join("sqlt_bs_base.sql");
+    std::fs::write(&tmp_sch, "CREATE TABLE t (id INT)").expect("write base");
+    let tmp_json = std::env::temp_dir().join("sqlt_bs_base.json");
+
+    // Compile the base schema
+    let (_, _, code) = run(
+        sqlt().args([
+            "build-schema",
+            "--from",
+            "mysql",
+            "--schema",
+            tmp_sch.to_str().unwrap(),
+            "-o",
+            tmp_json.to_str().unwrap(),
+        ]),
+        "",
+    );
+    assert_eq!(code, 0);
+
+    // Late-arriving migration (raw SQL, not yet rolled into the artifact).
+    let tmp_late = std::env::temp_dir().join("sqlt_bs_late.sql");
+    std::fs::write(&tmp_late, "ALTER TABLE t ADD COLUMN created_at TIMESTAMP").expect("write late");
+
+    // Mix .json + .sql in CLI order — the late migration applies on top.
+    let (_, _, code) = run(
+        sqlt().args([
+            "lint",
+            "--from",
+            "mysql",
+            "--schema",
+            tmp_json.to_str().unwrap(),
+            "--schema",
+            tmp_late.to_str().unwrap(),
+        ]),
+        "SELECT t.created_at FROM t",
+    );
+    assert_eq!(code, 0, "the new column should resolve");
+}
+
+#[test]
+fn lint_multi_database_no_collision() {
+    let tmp = std::env::temp_dir().join("sqlt_multidb.sql");
+    std::fs::write(
+        &tmp,
+        "USE shop_db; CREATE TABLE orders (id INT NOT NULL, sid INT NOT NULL); \
+         USE global_db; CREATE TABLE orders (uid INT NOT NULL, payload TEXT)",
+    )
+    .expect("write");
+
+    // Reference shop_db.orders.sid — present, no warning.
+    let (_, _, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--schema", tmp.to_str().unwrap()]),
+        "SELECT shop_db.orders.sid FROM shop_db.orders",
+    );
+    assert_eq!(code, 0);
+
+    // Reference shop_db.orders.uid — uid is in global_db, not shop_db. SQLT0900.
+    let (stdout, _, code) = run(
+        sqlt().args(["lint", "--from", "mysql", "--schema", tmp.to_str().unwrap()]),
+        "SELECT shop_db.orders.uid FROM shop_db.orders",
+    );
+    assert_eq!(code, 1);
+    assert!(stdout.contains("SQLT0900"), "got: {stdout:?}");
+    assert!(
+        stdout.contains("shop_db.orders"),
+        "diagnostic should mention the resolved table: {stdout:?}"
+    );
+}
+
+#[test]
+fn lint_multiple_schema_flags_processed_in_order() {
+    // First file creates the table; second file adds a column. The query
+    // references the column added by the second file — must succeed.
+    let a = std::env::temp_dir().join("sqlt_schema_a.sql");
+    std::fs::write(&a, "CREATE TABLE t (id INT)").expect("write a");
+    let b = std::env::temp_dir().join("sqlt_schema_b.sql");
+    std::fs::write(&b, "ALTER TABLE t ADD COLUMN email VARCHAR(100)").expect("write b");
+
+    let (stdout, _, code) = run(
+        sqlt().args([
+            "lint",
+            "--from",
+            "mysql",
+            "--schema",
+            a.to_str().unwrap(),
+            "--schema",
+            b.to_str().unwrap(),
+        ]),
+        "SELECT t.email FROM t",
+    );
+    assert_eq!(code, 0, "no SQLT0900 expected; stdout: {stdout:?}");
+}
+
+#[test]
 fn unknown_encoding_exits_two() {
     let (_, stderr, code) = run(
         sqlt().args(["parse", "--from", "mysql", "-e", "ebcdic"]),

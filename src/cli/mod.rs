@@ -1,3 +1,4 @@
+pub mod build_schema;
 pub mod emit;
 pub mod examples;
 pub mod lint;
@@ -140,6 +141,15 @@ pub enum Command {
     /// Analyze SQL for pitfalls and improvement suggestions.
     #[command(long_about = LINT_LONG_ABOUT)]
     Lint(LintArgs),
+    /// Compile a reusable schema artifact from one or more SQL files.
+    ///
+    /// Reads `--schema` files (CREATE/ALTER/DROP TABLE, CREATE INDEX,
+    /// CREATE DATABASE, USE, …), replays the DDL, and emits a JSON file
+    /// that `sqlt lint --schema schema.json` can load directly. Useful
+    /// for repos with long migration histories — compile once, lint many
+    /// times. Mixing `.json` and `.sql` later is supported:
+    /// `sqlt lint --schema base.json --schema migrations/late.sql`.
+    BuildSchema(BuildSchemaArgs),
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -377,6 +387,15 @@ pub struct LintArgs {
     #[arg(long = "list-rules")]
     pub list_rules: bool,
 
+    /// Schema input file (repeatable). Accepts .sql (parsed and replayed)
+    /// or .json (a previously built artifact from `sqlt build-schema`).
+    /// Files are processed in CLI order; the `USE` cursor and CREATE
+    /// DATABASE state persist across files. Schema files are NOT linted —
+    /// they only feed the schema model. Statements that don't affect the
+    /// schema produce a stderr `note:` line.
+    #[arg(long = "schema")]
+    pub schemas: Vec<PathBuf>,
+
     /// Encoding of the input bytes. Same set as `parse --encoding`.
     #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
     pub encoding: Encoding,
@@ -393,6 +412,35 @@ fn parse_encoding(s: &str) -> std::result::Result<Encoding, String> {
     s.parse::<Encoding>().map_err(|e| e.to_string())
 }
 
+#[derive(Debug, clap::Args)]
+pub struct BuildSchemaArgs {
+    /// Source SQL dialect (parses every `--schema` file with this dialect).
+    #[arg(long = "from", value_parser = parse_dialect)]
+    pub from: Option<DialectId>,
+
+    /// Schema input file (repeatable). Each is parsed and replayed in CLI
+    /// order. Files with a `.json` extension are loaded as a previously
+    /// built artifact and merged in.
+    #[arg(long = "schema")]
+    pub schemas: Vec<PathBuf>,
+
+    /// Encoding of the schema files.
+    #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
+    pub encoding: Encoding,
+
+    /// Output file path. Omit to write to stdout.
+    #[arg(long, short = 'o')]
+    pub output: Option<PathBuf>,
+
+    /// Pretty-print the JSON output.
+    #[arg(long)]
+    pub pretty: bool,
+
+    /// Print in-depth examples for this subcommand and exit.
+    #[arg(long = "examples")]
+    pub examples: bool,
+}
+
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -400,6 +448,7 @@ pub fn run() -> Result<()> {
         Command::Emit(args) => emit::run(args),
         Command::Translate(args) => translate::run(args),
         Command::Lint(args) => lint::run(args),
+        Command::BuildSchema(args) => build_schema::run(args),
     }
 }
 

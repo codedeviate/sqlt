@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-02
+
 ### Added
+- **`--schema <file>` flag on `sqlt lint`** (repeatable). Parses each file as schema input — `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, `CREATE INDEX`, foreign-key constraints, `CREATE DATABASE`, `USE`. Replays them in CLI order so the schema reflects its current state, not its initial CREATE. Schema files are NOT linted (only feed the model). Statements that don't affect the schema (INSERT, GRANT, DELIMITER, stored-procedure bodies, …) emit `note: skipping <kind> at <file>:<line>` on stderr. Files with `.json` extension are loaded as a previously built artifact (see `build-schema`).
+- **`sqlt build-schema` subcommand.** Compiles one or more `--schema` files into a JSON artifact that can be consumed by `--schema schema.json` later. Use case: a long migration history that takes time to parse + replay can be compiled once, checked into the repo, and re-used by every CI lint run. Mixing `.json` + `.sql` is supported: `sqlt lint --schema base.json --schema migrations/late.sql query.sql`.
+- **Per-database namespacing.** Schemas now track `CREATE DATABASE` and `USE`; tables live in per-database namespaces. Queries can use 3-part `db.table.col` references; the `USE` cursor persists across `--schema` files in CLI order. Same-named tables in different databases no longer collide (e.g. `shop_db.orders` and `global_db.orders`).
+- **Full DDL replay** in `Schema::apply_statement`: CREATE/ALTER/DROP TABLE, ADD/DROP/MODIFY/CHANGE/RENAME COLUMN, RENAME TO (within and across DB), CREATE [UNIQUE] INDEX, ALTER TABLE ADD INDEX/UNIQUE/PRIMARY KEY/FULLTEXT/SPATIAL, ADD CONSTRAINT FOREIGN KEY, DROP INDEX/CONSTRAINT/FOREIGN KEY/PRIMARY KEY, CREATE TABLE LIKE (column copy from referenced table), CREATE OR REPLACE TABLE. `IF EXISTS`/`IF NOT EXISTS` guards are honored. Missing-target ops emit a stderr `note:` but never error.
+- `Schema` is now serializable via `serde` for the JSON artifact path. Indexes and foreign keys are tracked in the model (no rule consumes them yet, but the data is available for future SQLT0503-style refinements).
+- ~17 new schema unit tests covering each DDL shape, plus 6 new CLI integration tests for `--schema`, multi-DB namespacing, late-migration mixing, and the build-schema round-trip.
+
+### Added (earlier this cycle, still in 0.3.0)
 - **Schema-aware lint pass.** `lint::lint` now builds a `Schema` model from every `CREATE TABLE` statement in the input before running rules and passes it to each rule via `LintCtx::schema`. Lookups are case-insensitive; `NOT NULL` and `PRIMARY KEY` are tracked per column.
 - New rule **SQLT0900 unknown-column** (Schema category, error, default-on). Fires when a `table.col` reference resolves to a `CREATE TABLE` in the same input but the column doesn't exist on that table. Also catches typos in the `INSERT INTO Foo (col1, col2)` column list. Conservative — never warns about CTEs, derived-table aliases, or tables defined elsewhere.
 - New rule category `Schema` (`SQLT09xx` namespace) for rules that consult the schema model.
@@ -75,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The `statements` field of the JSON envelope is now `Vec<SqltStatement>` instead of `Vec<Statement>`. For typed statements the on-the-wire shape is unchanged thanks to `#[serde(untagged)]`; only raw fallback fragments introduce a new shape.
 
-[Unreleased]: https://github.com/thomasbjork/sqlt/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/thomasbjork/sqlt/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/thomasbjork/sqlt/releases/tag/v0.3.0
 [0.2.0]: https://github.com/thomasbjork/sqlt/releases/tag/v0.2.0
 [0.1.0]: https://github.com/thomasbjork/sqlt/releases/tag/v0.1.0

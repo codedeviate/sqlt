@@ -1,7 +1,7 @@
 //! Schema-aware rules — only fire when a `CREATE TABLE` for the
 //! referenced object is present in the same input.
 
-use sqlparser::ast::{Expr, ObjectNamePart, Select, SelectItem, Statement, TableFactor};
+use sqlparser::ast::{Expr, Select, SelectItem, Statement, TableFactor};
 
 use crate::ast::SqltStatement;
 use crate::lint::ctx::LintCtx;
@@ -40,18 +40,24 @@ impl Rule for UnknownColumn {
         let SqltStatement::Std(boxed) = stmt else {
             return;
         };
-        // INSERT INTO Foo (col1, col2, …) — column list is unqualified but
-        // the target table is known.
+        // INSERT INTO [db.]Foo (col1, col2, …) — column list is unqualified
+        // but the target table can be qualified.
         if let Statement::Insert(i) = &**boxed {
-            let table = match &i.table {
-                sqlparser::ast::TableObject::TableName(name) => last_part(name.0.as_slice()),
+            let resolved = match &i.table {
+                sqlparser::ast::TableObject::TableName(name) => {
+                    Some(ctx.schema.resolve_table_name(name))
+                }
                 _ => None,
             };
-            if let Some(table) = table
-                && ctx.schema.table(&table).is_some()
+            if let Some((db, table)) = resolved
+                && ctx.schema.table_qualified(&db, &table).is_some()
             {
                 for col in &i.columns {
-                    if ctx.schema.column(&table, &col.value).is_none() {
+                    if ctx
+                        .schema
+                        .column_qualified(&db, &table, &col.value)
+                        .is_none()
+                    {
                         out.push(diag(
                             &META_UNKNOWN_COL,
                             ctx,
@@ -112,11 +118,17 @@ impl Rule for UnknownColumn {
     }
 }
 
-/// Build the set of identifiers visible as table-side names in a SELECT —
-/// either the explicit alias (`users u`) or the table name itself
-/// (`users`). Maps each to the underlying schema-table-name (lower-cased).
-/// Skips entries we can't resolve (CTEs, derived tables, function calls).
-fn collect_known_aliases(select: &Select, ctx: &LintCtx) -> Vec<(String, String)> {
+/// One entry per table source visible inside a SELECT's FROM/JOIN. Maps
+/// the user-visible alias (or bare table name) to the resolved
+/// `(database, table)` pair from the schema.
+#[derive(Clone, Debug)]
+struct TableAlias {
+    visible: String,
+    database: String,
+    table: String,
+}
+
+fn collect_known_aliases(select: &Select, ctx: &LintCtx) -> Vec<TableAlias> {
     let mut aliases = Vec::new();
     for tw in &select.from {
         push_table_factor(&tw.relation, ctx, &mut aliases);
@@ -127,49 +139,86 @@ fn collect_known_aliases(select: &Select, ctx: &LintCtx) -> Vec<(String, String)
     aliases
 }
 
-fn push_table_factor(tf: &TableFactor, ctx: &LintCtx, aliases: &mut Vec<(String, String)>) {
+fn push_table_factor(tf: &TableFactor, ctx: &LintCtx, aliases: &mut Vec<TableAlias>) {
     if let TableFactor::Table { name, alias, .. } = tf {
-        let Some(schema_name) = last_part(name.0.as_slice()) else {
-            return;
-        };
-        if ctx.schema.table(&schema_name).is_none() {
-            // Unknown table — don't claim it.
+        let (db, table) = ctx.schema.resolve_table_name(name);
+        if ctx.schema.table_qualified(&db, &table).is_none() {
             return;
         }
         let visible = match alias {
             Some(a) => a.name.value.clone(),
-            None => schema_name.clone(),
+            None => table.clone(),
         };
-        aliases.push((visible, schema_name));
+        aliases.push(TableAlias {
+            visible,
+            database: db,
+            table,
+        });
     }
 }
 
-fn walk_expr(e: &Expr, aliases: &[(String, String)], ctx: &LintCtx, out: &mut Vec<Diagnostic>) {
+fn walk_expr(e: &Expr, aliases: &[TableAlias], ctx: &LintCtx, out: &mut Vec<Diagnostic>) {
     match e {
         Expr::CompoundIdentifier(parts) if parts.len() >= 2 => {
-            let table_ref = &parts[parts.len() - 2].value;
-            let col_ref = &parts[parts.len() - 1].value;
-            // Resolve through the alias map.
-            let schema_name = aliases
+            let n = parts.len();
+            let col_ref = &parts[n - 1].value;
+            let col_span = parts[n - 1].span;
+
+            // 3-part identifier: db.table.col
+            if n >= 3 {
+                let db_ref = &parts[n - 3].value;
+                let table_ref = &parts[n - 2].value;
+                if ctx.schema.table_qualified(db_ref, table_ref).is_some() {
+                    if ctx
+                        .schema
+                        .column_qualified(db_ref, table_ref, col_ref)
+                        .is_none()
+                    {
+                        out.push(diag(
+                            &META_UNKNOWN_COL,
+                            ctx,
+                            &format!(
+                                "column `{}` does not exist on table `{}.{}` (declared in this input)",
+                                col_ref, db_ref, table_ref
+                            ),
+                            Some(format!(
+                                "check spelling, or add `{}` to `CREATE TABLE {}.{}`",
+                                col_ref, db_ref, table_ref
+                            )),
+                            col_span,
+                        ));
+                    }
+                    return;
+                }
+                // 3-part but the table isn't in the schema — skip silently.
+                return;
+            }
+
+            // 2-part identifier: alias.col or table.col
+            let table_ref = &parts[n - 2].value;
+            let alias = aliases
                 .iter()
-                .find(|(visible, _)| visible.eq_ignore_ascii_case(table_ref))
-                .map(|(_, real)| real.clone());
-            let Some(schema_name) = schema_name else {
+                .find(|a| a.visible.eq_ignore_ascii_case(table_ref));
+            let Some(alias) = alias else {
                 return;
             };
-            if ctx.schema.column(&schema_name, col_ref).is_none() {
+            if ctx
+                .schema
+                .column_qualified(&alias.database, &alias.table, col_ref)
+                .is_none()
+            {
                 out.push(diag(
                     &META_UNKNOWN_COL,
                     ctx,
                     &format!(
                         "column `{}` does not exist on table `{}` (declared in this input)",
-                        col_ref, schema_name
+                        col_ref, alias.table
                     ),
                     Some(format!(
                         "check spelling, or add `{}` to `CREATE TABLE {}`",
-                        col_ref, schema_name
+                        col_ref, alias.table
                     )),
-                    parts[parts.len() - 1].span,
+                    col_span,
                 ));
             }
         }
@@ -197,13 +246,6 @@ fn walk_expr(e: &Expr, aliases: &[(String, String)], ctx: &LintCtx, out: &mut Ve
         }
         _ => {}
     }
-}
-
-fn last_part(parts: &[ObjectNamePart]) -> Option<String> {
-    parts.last().and_then(|p| match p {
-        ObjectNamePart::Identifier(i) => Some(i.value.clone()),
-        _ => None,
-    })
 }
 
 fn diag(

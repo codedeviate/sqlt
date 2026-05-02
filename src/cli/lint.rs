@@ -1,10 +1,18 @@
-use crate::cli::{LintArgs, read_input_text};
+use crate::cli::{LintArgs, examples, read_input_text};
 use crate::error::{Error, Result};
 use crate::lint::{self, LintOptions, Severity, format};
 use crate::parse;
 
 pub fn run(args: LintArgs) -> Result<()> {
-    // --explain short-circuits before any parsing.
+    // Short-circuits that don't need input.
+    if args.examples {
+        examples::print(examples::LINT);
+        return Ok(());
+    }
+    if args.list_rules {
+        print_rule_list();
+        return Ok(());
+    }
     if let Some(id) = args.explain.as_deref() {
         let meta = lint::registry::find_meta(id)?;
         println!("{}  ({})", meta.id, meta.name);
@@ -21,9 +29,11 @@ pub fn run(args: LintArgs) -> Result<()> {
         return Ok(());
     }
 
-    let from = args
-        .from
-        .ok_or_else(|| Error::UnknownDialect("--from is required (or pass --explain)".into()))?;
+    let from = args.from.ok_or_else(|| {
+        Error::UnknownDialect(
+            "--from is required (or pass --examples / --explain / --list-rules)".into(),
+        )
+    })?;
 
     let source_label: String = match args.input.as_deref() {
         Some(p) if p.as_os_str() != "-" => p.display().to_string(),
@@ -68,6 +78,39 @@ pub fn run(args: LintArgs) -> Result<()> {
         return Err(Error::LintFindings);
     }
     Ok(())
+}
+
+/// Render the `--list-rules` table. Sorted by rule id.
+fn print_rule_list() {
+    let rules = lint::registry::all_rules();
+    println!(
+        "{:<10}  {:<35}  {:<13}  {:<7}  {:<8}  SUMMARY",
+        "ID", "SLUG", "CATEGORY", "SEV", "DEFAULT"
+    );
+    let bar: String = "─".repeat(120);
+    println!("{bar}");
+    for r in &rules {
+        let m = r.meta();
+        println!(
+            "{:<10}  {:<35}  {:<13}  {:<7}  {:<8}  {}",
+            m.id.as_str(),
+            m.name,
+            m.category.as_str(),
+            m.default_severity.as_str(),
+            if m.default_enabled { "on" } else { "off" },
+            m.summary,
+        );
+    }
+    println!();
+    println!(
+        "{} rule{} total ({} on by default, {} off)",
+        rules.len(),
+        if rules.len() == 1 { "" } else { "s" },
+        rules.iter().filter(|r| r.meta().default_enabled).count(),
+        rules.iter().filter(|r| !r.meta().default_enabled).count(),
+    );
+    println!();
+    println!("Run `sqlt lint --explain <ID|SLUG>` for full documentation on any rule.");
 }
 
 /// `Severity` ordering: `Error < Warning < Info` per derive(Ord). To mean

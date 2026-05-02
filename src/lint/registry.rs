@@ -12,6 +12,14 @@ use crate::lint::rules;
 /// output stable.
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     let mut v: Vec<Box<dyn Rule>> = vec![
+        // raw passthrough
+        Box::new(rules::raw::RawPassthrough),
+        // dialect cross-contamination
+        Box::new(rules::dialect_xc::MysqlBacktickInNonMysql),
+        Box::new(rules::dialect_xc::MssqlBracketInNonMssql),
+        Box::new(rules::dialect_xc::PostgresDoubleColonCastInMysql),
+        Box::new(rules::dialect_xc::MysqlOnDuplicateKeyInNonMysql),
+        Box::new(rules::dialect_xc::ReturningInMysql),
         // perf
         Box::new(rules::perf::SelectStar),
         Box::new(rules::perf::SelectStarQualified),

@@ -40,6 +40,120 @@ expression: normalised
                 "level": "warning"
               },
               "fullDescription": {
+                "text": "MariaDB constructs that don't yet have a typed sqlparser node — system versioning, FOR SYSTEM_TIME, CREATE PACKAGE, MariaDB sequence option ordering, vector types — are kept as raw text. Same-dialect round-trip preserves them; cross-dialect translation will reject them with a RAW_PASSTHROUGH warning. The `reason` field on the parsed JSON envelope identifies which class of construct triggered the fallback."
+              },
+              "id": "SQLT0001",
+              "name": "raw-passthrough",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "raw"
+                ]
+              },
+              "shortDescription": {
+                "text": "A statement fell back to raw passthrough — no typed AST in sqlparser 0.59."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "PostgreSQL, MSSQL, and SQLite use double quotes (or square brackets, in MSSQL). Backticks here suggest the SQL was originally written for MySQL and ported without rewriting the quoting style. Pass the SQL through `sqlt translate` to rewrite quoting, or update the source."
+              },
+              "id": "SQLT0100",
+              "name": "mysql-backtick-in-non-mysql",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "dialect-xc"
+                ]
+              },
+              "shortDescription": {
+                "text": "Backtick-quoted identifiers (`` `id` ``) are MySQL/MariaDB-only."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Other dialects use double quotes or backticks. Most non-MSSQL parsers reject brackets outright; this rule fires under the Generic dialect, which accepts them, and serves as a heads-up that translation to a real target dialect will fail or silently mis-quote."
+              },
+              "id": "SQLT0101",
+              "name": "mssql-bracket-in-non-mssql",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "dialect-xc"
+                ]
+              },
+              "shortDescription": {
+                "text": "Square-bracket-quoted identifiers (`[id]`) are MSSQL-specific."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "MySQL and MariaDB use `CAST(x AS INT)`. SQLite is loose and accepts both, MSSQL uses `CAST` or `CONVERT`. This rule fires when the AST shows a DoubleColon cast — usually only reachable from Generic or Postgres source dialects."
+              },
+              "id": "SQLT0102",
+              "name": "postgres-double-colon-cast-in-mysql",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "dialect-xc"
+                ]
+              },
+              "shortDescription": {
+                "text": "`x::int` double-colon cast is PostgreSQL-specific syntax."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "PostgreSQL and SQLite use `ON CONFLICT (...) DO UPDATE SET ...`. MSSQL uses `MERGE`. The MySQL clause will not parse against any other real dialect. `sqlt translate --from mysql --to postgres` rewrites the simple cases."
+              },
+              "id": "SQLT0103",
+              "name": "mysql-on-duplicate-key-in-non-mysql",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "dialect-xc"
+                ]
+              },
+              "shortDescription": {
+                "text": "`ON DUPLICATE KEY UPDATE` is MySQL/MariaDB-only."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "MariaDB added RETURNING in 10.5+ for INSERT/REPLACE/UPDATE/DELETE; MySQL has not. If you're targeting MySQL, the clause will be a parse error against the real server (sqlparser parses it leniently). MSSQL uses an `OUTPUT` clause; Postgres/SQLite/MariaDB use RETURNING."
+              },
+              "id": "SQLT0104",
+              "name": "returning-in-mysql",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "dialect-xc"
+                ]
+              },
+              "shortDescription": {
+                "text": "MySQL does not support RETURNING on INSERT/UPDATE/DELETE (MariaDB does)."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
                 "text": "A comma-separated FROM clause produces a cartesian product unless the WHERE clause filters it down. Even when correct, modern explicit `JOIN ... ON` syntax is much more readable. Mixing comma joins with explicit JOINs (see SQLT0307) is a precedence bug magnet."
               },
               "id": "SQLT0300",

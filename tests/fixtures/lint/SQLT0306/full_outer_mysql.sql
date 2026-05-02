@@ -1,0 +1,1 @@
+SELECT a FROM t1 FULL OUTER JOIN t2 ON t1.id = t2.id

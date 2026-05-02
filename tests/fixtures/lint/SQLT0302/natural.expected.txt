@@ -1,0 +1,3 @@
+natural.sql:1:1: warning [SQLT0302] NATURAL JOIN auto-binds on every same-named column
+natural.sql:1:1:   help: use explicit ON or USING
+1 diagnostic: 0 errors, 1 warning, 0 info

@@ -1,0 +1,3 @@
+comma.sql:1:1: warning [SQLT0300] FROM has 2 comma-separated tables; this is an implicit cross join
+comma.sql:1:1:   help: rewrite as `a CROSS JOIN b` or add an `ON` clause
+1 diagnostic: 0 errors, 1 warning, 0 info

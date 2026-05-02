@@ -11,7 +11,27 @@ use crate::lint::rules;
 /// order for diagnostics from a single statement; sort by rule id to keep
 /// output stable.
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
-    let mut v: Vec<Box<dyn Rule>> = vec![Box::new(rules::perf::SelectStar)];
+    let mut v: Vec<Box<dyn Rule>> = vec![
+        // perf
+        Box::new(rules::perf::SelectStar),
+        // joins
+        Box::new(rules::joins::ImplicitCrossJoin),
+        Box::new(rules::joins::CrossJoinWithoutWhere),
+        Box::new(rules::joins::NaturalJoin),
+        Box::new(rules::joins::JoinWithoutOn),
+        Box::new(rules::joins::OnTautology),
+        Box::new(rules::joins::UsingWithQuotedIdent),
+        Box::new(rules::joins::FullOuterMysql),
+        Box::new(rules::joins::CommaJoinWithOnElsewhere),
+        // correctness
+        Box::new(rules::correctness::EqualsNull),
+        Box::new(rules::correctness::UpdateWithoutWhere),
+        Box::new(rules::correctness::DeleteWithoutWhere),
+        Box::new(rules::correctness::MixedAndOrNoParens),
+        Box::new(rules::correctness::OrderByPositional),
+        Box::new(rules::correctness::HavingWithoutGroupBy),
+        Box::new(rules::correctness::GroupByPositional),
+    ];
     v.sort_by_key(|r| r.meta().id);
     v
 }

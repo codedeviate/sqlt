@@ -37,6 +37,158 @@ expression: normalised
           "rules": [
             {
               "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "A comma-separated FROM clause produces a cartesian product unless the WHERE clause filters it down. Even when correct, modern explicit `JOIN ... ON` syntax is much more readable. Mixing comma joins with explicit JOINs (see SQLT0307) is a precedence bug magnet."
+              },
+              "id": "SQLT0300",
+              "name": "implicit-cross-join",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "`FROM a, b` is a comma cross join — usually unintended."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Cartesian products on real tables are almost always wrong and almost always slow. If you really mean it, add a comment, otherwise add a WHERE clause or convert to an INNER JOIN with an ON predicate."
+              },
+              "id": "SQLT0301",
+              "name": "cross-join-without-where",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "`CROSS JOIN` with no WHERE clause produces a full cartesian product."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Natural joins use whatever columns happen to share names today. A future schema change adds an unrelated column with a colliding name and the join semantics change without warning. Always use an explicit `ON` or `USING` clause."
+              },
+              "id": "SQLT0302",
+              "name": "natural-join",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "`NATURAL JOIN` is fragile — adding a column to either table silently changes the join."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Older parsers tolerated `... JOIN tbl` without a constraint and fell back to a cross join. Modern code should always supply an explicit join predicate."
+              },
+              "id": "SQLT0303",
+              "name": "join-without-on",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "An INNER/LEFT/RIGHT/FULL JOIN without an ON or USING clause is almost always a bug."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "If you want a cross join, write `CROSS JOIN`. A tautological ON predicate is a code smell that usually means the author forgot to fill in the real predicate."
+              },
+              "id": "SQLT0304",
+              "name": "on-tautology",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "`ON 1=1` (or `ON TRUE`) turns any join into a cross join."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Some dialects fold unquoted identifiers to lowercase; others to uppercase. Quoted identifiers preserve case. Mixing quoted USING column names with unquoted table-side columns can produce subtle case-mismatch bugs. Prefer ON."
+              },
+              "id": "SQLT0305",
+              "name": "using-with-quoted-ident",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "`USING(\"col\")` with quoted identifiers can disagree across dialects on case folding."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "MariaDB also lacks native FULL OUTER JOIN as of recent releases. Emulate with `LEFT JOIN ... UNION ALL ... RIGHT JOIN ... WHERE l.id IS NULL`. PostgreSQL, MSSQL, and SQLite (3.39+) support it natively."
+              },
+              "id": "SQLT0306",
+              "name": "full-outer-in-mysql",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "MySQL does not support `FULL OUTER JOIN`."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Comma has lower precedence than the explicit JOIN keyword in most dialects, so `FROM a, b JOIN c ON c.id = b.id` joins c with b first and then cartesian-products the result with a. Always use one style consistently — preferably explicit JOINs."
+              },
+              "id": "SQLT0307",
+              "name": "comma-join-with-on-elsewhere",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "joins"
+                ]
+              },
+              "shortDescription": {
+                "text": "Mixing comma joins (`FROM a, b`) with explicit `JOIN ... ON` is a precedence trap."
+              }
+            },
+            {
+              "defaultConfiguration": {
                 "level": "note"
               },
               "fullDescription": {
@@ -52,6 +204,139 @@ expression: normalised
               },
               "shortDescription": {
                 "text": "`SELECT *` returns every column, including ones the query does not need."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "SQL three-valued logic: `col = NULL` is neither true nor false — it's UNKNOWN, so the row is filtered out. Use `IS NULL` or `IS NOT NULL` instead."
+              },
+              "id": "SQLT0600",
+              "name": "equals-null",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "Comparing a column to NULL with `=` or `!=` always evaluates to UNKNOWN."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Almost always a mistake. If you really mean to touch every row, add `WHERE TRUE` or otherwise show your intent."
+              },
+              "id": "SQLT0601",
+              "name": "update-without-where",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "`UPDATE` without a `WHERE` clause modifies every row in the table."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Almost always a mistake. Use `TRUNCATE` for intentional whole-table wipes, or add `WHERE TRUE` to show intent."
+              },
+              "id": "SQLT0602",
+              "name": "delete-without-where",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "`DELETE` without a `WHERE` clause removes every row in the table."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "`AND` binds tighter than `OR`, so `a OR b AND c` parses as `a OR (b AND c)`. Reviewers and reading tools commonly misread it. Parenthesize the AND-side explicitly to make precedence visible."
+              },
+              "id": "SQLT0603",
+              "name": "mixed-and-or-no-parens",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "An `OR` whose operand is an unparenthesized `AND` is a precedence trap."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Positional ORDER BY is brittle: any change to the SELECT list shifts the meaning. Refer to the column by name or alias instead."
+              },
+              "id": "SQLT0604",
+              "name": "order-by-positional",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "`ORDER BY <number>` references a projection column by position."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "HAVING is meant to filter aggregated groups. Without GROUP BY there is exactly one implicit group, so HAVING usually means `WHERE`. Some dialects accept this; most readers will misread it."
+              },
+              "id": "SQLT0605",
+              "name": "having-without-group-by",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "`HAVING` without `GROUP BY` is almost always a mistake."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Positional GROUP BY is brittle: any change to the SELECT list shifts the meaning. Refer to the column by name or expression instead."
+              },
+              "id": "SQLT0606",
+              "name": "group-by-positional",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "correctness"
+                ]
+              },
+              "shortDescription": {
+                "text": "`GROUP BY <number>` references a projection column by position."
               }
             }
           ],

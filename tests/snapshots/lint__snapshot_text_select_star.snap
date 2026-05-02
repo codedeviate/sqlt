@@ -1,0 +1,7 @@
+---
+source: tests/lint.rs
+expression: "lint_text(\"SELECT * FROM users\", \"schema.sql\", DialectId::MySql)"
+---
+schema.sql:1:8: info [SQLT0500] SELECT * returns every column, including ones the query does not need
+schema.sql:1:8:   help: enumerate the columns the query actually uses
+1 diagnostic: 0 errors, 0 warnings, 1 info

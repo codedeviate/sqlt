@@ -13,6 +13,60 @@ use sqlt::dialect::DialectId;
 use sqlt::lint::{self, LintOptions, format};
 use sqlt::parse;
 
+fn lint_text(sql: &str, source_label: &str, from: DialectId) -> String {
+    let stmts = parse::parse(sql, from).expect("parse");
+    let mut diagnostics =
+        lint::lint(&stmts, sql, from, None, &LintOptions::default()).expect("lint");
+    lint::sort(&mut diagnostics);
+    format::render(format::Format::Text, source_label, sql, &diagnostics).expect("render")
+}
+
+fn lint_json(sql: &str, source_label: &str, from: DialectId) -> String {
+    let stmts = parse::parse(sql, from).expect("parse");
+    let mut diagnostics =
+        lint::lint(&stmts, sql, from, None, &LintOptions::default()).expect("lint");
+    lint::sort(&mut diagnostics);
+    format::render(format::Format::Json, source_label, sql, &diagnostics).expect("render")
+}
+
+fn lint_sarif(sql: &str, source_label: &str, from: DialectId) -> String {
+    let stmts = parse::parse(sql, from).expect("parse");
+    let mut diagnostics =
+        lint::lint(&stmts, sql, from, None, &LintOptions::default()).expect("lint");
+    lint::sort(&mut diagnostics);
+    format::render(format::Format::Sarif, source_label, sql, &diagnostics).expect("render")
+}
+
+#[test]
+fn snapshot_json_select_star() {
+    insta::assert_snapshot!(lint_json(
+        "SELECT * FROM users",
+        "schema.sql",
+        DialectId::MySql
+    ));
+}
+
+#[test]
+fn snapshot_sarif_select_star() {
+    let sarif = lint_sarif("SELECT * FROM users", "schema.sql", DialectId::MySql);
+    // Replace sqlt version + driver version (which embed CARGO_PKG_VERSION) so
+    // the snapshot doesn't churn on every minor bump.
+    let normalised = sarif.replace(
+        &format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION")),
+        "\"version\": \"<X.Y.Z>\"",
+    );
+    insta::assert_snapshot!(normalised);
+}
+
+#[test]
+fn snapshot_text_select_star() {
+    insta::assert_snapshot!(lint_text(
+        "SELECT * FROM users",
+        "schema.sql",
+        DialectId::MySql
+    ));
+}
+
 fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/lint")
 }
@@ -69,7 +123,7 @@ fn lint_fixture_walk() {
             lint::sort(&mut diagnostics);
 
             let actual =
-                format::render(format::Format::Text, &fname, &diagnostics).expect("render");
+                format::render(format::Format::Text, &fname, &sql, &diagnostics).expect("render");
             assert_eq!(
                 actual.trim_end(),
                 expected.trim_end(),

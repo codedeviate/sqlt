@@ -40,10 +40,19 @@ pub fn run(args: LintArgs) -> Result<()> {
     let mut diagnostics = lint::lint(&stmts, &sql, from, args.to, &opts)?;
     lint::sort(&mut diagnostics);
 
+    // Compute exit threshold against the *unfiltered* diagnostics so a
+    // severity filter on output doesn't accidentally suppress an exit.
     let exit_threshold = args.exit_on.severity();
     let any_at_threshold = diagnostics.iter().any(|d| d.severity <= exit_threshold);
 
-    let output = format::render(args.format, &source_label, &diagnostics)?;
+    let display_threshold = args.severity.severity();
+    let displayed: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity <= display_threshold)
+        .cloned()
+        .collect();
+
+    let output = format::render(args.format, &source_label, &sql, &displayed)?;
     print!("{output}");
 
     if any_at_threshold {

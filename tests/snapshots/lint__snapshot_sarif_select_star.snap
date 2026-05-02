@@ -1,0 +1,64 @@
+---
+source: tests/lint.rs
+expression: normalised
+---
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "schema.sql"
+                },
+                "region": {
+                  "endColumn": 9,
+                  "endLine": 1,
+                  "startColumn": 8,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "SELECT * returns every column, including ones the query does not need"
+          },
+          "ruleId": "SQLT0500"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/thomasbjork/sqlt",
+          "name": "sqlt",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Selecting all columns ships unused data over the wire, blocks covering-index plans, and silently picks up new columns when the schema evolves. Enumerate the columns you actually use. Qualified wildcards (`t.*`) after a join are exempt — see SQLT0501. Wildcards narrowed by EXCEPT/EXCLUDE/REPLACE/RENAME also do not fire this rule."
+              },
+              "id": "SQLT0500",
+              "name": "select-star",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "`SELECT *` returns every column, including ones the query does not need."
+              }
+            }
+          ],
+          "version": "<X.Y.Z>"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

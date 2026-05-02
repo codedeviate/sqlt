@@ -1,0 +1,35 @@
+---
+source: tests/lint.rs
+expression: "lint_json(\"SELECT * FROM users\", \"schema.sql\", DialectId::MySql)"
+---
+{
+  "sqlt_version": "0.1.0",
+  "source": "schema.sql",
+  "diagnostics": [
+    {
+      "rule": "SQLT0500",
+      "name": "select-star",
+      "category": "perf",
+      "severity": "info",
+      "message": "SELECT * returns every column, including ones the query does not need",
+      "suggestion": "enumerate the columns the query actually uses",
+      "stmt_index": 0,
+      "source_dialect": "mysql",
+      "span": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 9
+        }
+      }
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "info": 1
+  }
+}

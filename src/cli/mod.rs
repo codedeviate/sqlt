@@ -123,6 +123,10 @@ pub struct LintArgs {
     #[arg(long = "no-rule")]
     pub no_rule: Vec<String>,
 
+    /// Minimum severity to include in output (does not affect --exit-on).
+    #[arg(long = "severity", value_enum, default_value_t = ExitOn::Info)]
+    pub severity: ExitOn,
+
     /// Exit non-zero when any diagnostic is at or above this severity.
     #[arg(long = "exit-on", value_enum, default_value_t = ExitOn::Error)]
     pub exit_on: ExitOn,

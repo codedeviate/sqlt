@@ -240,7 +240,24 @@ fn mariadb_with_fallback(
         // Re-apply preprocessing to each piece so the per-fragment re-parse
         // also accepts bare `--<EOL>`.
         let piece_pp = preprocess_mariadb(trimmed);
-        match Parser::parse_sql(upstream, &piece_pp) {
+        // Pad the input with leading newlines so the parser's tokenizer
+        // produces AST `Location`s in the original file's line space.
+        // sqlparser counts lines from 1, so to make the first line of the
+        // fragment land on `start_line` we need `start_line - 1` newlines.
+        // Performance: O(n) string concat, but n is at most the file's line
+        // count which is bounded by file size — millions of lines per second.
+        let pad_lines = (start_line as usize).saturating_sub(1);
+        let padded = if pad_lines == 0 {
+            piece_pp
+        } else {
+            let mut s = String::with_capacity(pad_lines + piece_pp.len());
+            for _ in 0..pad_lines {
+                s.push('\n');
+            }
+            s.push_str(&piece_pp);
+            s
+        };
+        match Parser::parse_sql(upstream, &padded) {
             Ok(mut stmts) if !stmts.is_empty() => {
                 out.extend(stmts.drain(..).map(SqltStatement::from));
             }

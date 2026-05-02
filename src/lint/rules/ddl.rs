@@ -50,6 +50,7 @@ impl Rule for FloatForMoney {
                         col.name.value
                     ),
                     Some("use DECIMAL(p, s) for money-shaped columns".into()),
+                    col.name.span,
                 ));
             }
         }
@@ -112,6 +113,7 @@ impl Rule for VarcharWithoutLength {
                         col.name.value
                     ),
                     Some("specify a length, e.g. VARCHAR(255)".into()),
+                    col.name.span,
                 ));
             }
         }
@@ -125,7 +127,13 @@ fn diag(
     ctx: &LintCtx,
     msg: &str,
     suggestion: Option<String>,
+    span: sqlparser::tokenizer::Span,
 ) -> Diagnostic {
+    let s = if span.start.line == 0 && span.start.column == 0 {
+        ctx.stmt_span
+    } else {
+        span
+    };
     Diagnostic {
         rule: meta.id,
         rule_name: meta.name,
@@ -133,7 +141,7 @@ fn diag(
         severity: meta.default_severity,
         message: msg.to_string(),
         suggestion,
-        span: ctx.stmt_span,
+        span: s,
         stmt_index: ctx.stmt_index,
         source_dialect: ctx.src,
         target_dialect: ctx.dst,

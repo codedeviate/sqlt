@@ -102,7 +102,17 @@ pub trait Rule: Send + Sync {
     fn meta(&self) -> &'static RuleMeta;
 
     fn check_statement(&self, _stmt: &SqltStatement, _ctx: &LintCtx, _out: &mut Vec<Diagnostic>) {}
-    fn check_query(&self, _query: &Query, _ctx: &LintCtx, _out: &mut Vec<Diagnostic>) {}
+    /// `depth` is 0 for the outermost Query of a statement and increases for
+    /// nested queries (subqueries, derived tables, CTEs, scalar subqueries).
+    /// Rules that should only flag nested constructs can guard on `depth > 0`.
+    fn check_query(
+        &self,
+        _query: &Query,
+        _depth: usize,
+        _ctx: &LintCtx,
+        _out: &mut Vec<Diagnostic>,
+    ) {
+    }
     fn check_select(&self, _select: &Select, _ctx: &LintCtx, _out: &mut Vec<Diagnostic>) {}
     fn check_expr(&self, _expr: &Expr, _ctx: &LintCtx, _out: &mut Vec<Diagnostic>) {}
 }

@@ -192,7 +192,13 @@ impl Rule for OrderByPositional {
     fn meta(&self) -> &'static RuleMeta {
         &META_ORDER_POS
     }
-    fn check_query(&self, query: &sqlparser::ast::Query, ctx: &LintCtx, out: &mut Vec<Diagnostic>) {
+    fn check_query(
+        &self,
+        query: &sqlparser::ast::Query,
+        _depth: usize,
+        ctx: &LintCtx,
+        out: &mut Vec<Diagnostic>,
+    ) {
         if let Some(OrderBy {
             kind: OrderByKind::Expressions(exprs),
             ..

@@ -34,7 +34,12 @@ pub fn walk_statement(
     let SqltStatement::Std(boxed) = stmt else {
         return;
     };
-    let mut driver = Driver { rules, ctx, out };
+    let mut driver = Driver {
+        rules,
+        ctx,
+        out,
+        query_depth: 0,
+    };
     let _ = (**boxed).visit(&mut driver);
 }
 
@@ -42,12 +47,15 @@ struct Driver<'a, 'b, 'c> {
     rules: &'a [Box<dyn Rule>],
     ctx: &'a LintCtx<'b>,
     out: &'c mut Vec<Diagnostic>,
+    /// 0 for the outermost statement-level Query; increases as we descend
+    /// into nested queries.
+    query_depth: usize,
 }
 
 impl<'a, 'b, 'c> Driver<'a, 'b, 'c> {
     fn fire_query(&mut self, query: &Query) {
         for r in self.rules {
-            r.check_query(query, self.ctx, self.out);
+            r.check_query(query, self.query_depth, self.ctx, self.out);
         }
         // Descend into the query body looking for Selects. SetExpr can be
         // a Select, a SetOperation (UNION/INTERSECT/EXCEPT), or a parenthesized
@@ -59,11 +67,12 @@ impl<'a, 'b, 'c> Driver<'a, 'b, 'c> {
         match set {
             SetExpr::Select(s) => self.fire_select(s),
             SetExpr::Query(q) => {
-                // Re-fire as a nested Query — Visit didn't enter it.
+                self.query_depth += 1;
                 for r in self.rules {
-                    r.check_query(q, self.ctx, self.out);
+                    r.check_query(q, self.query_depth, self.ctx, self.out);
                 }
                 self.descend_set_expr(&q.body);
+                self.query_depth -= 1;
             }
             SetExpr::SetOperation { left, right, .. } => {
                 self.descend_set_expr(left);
@@ -90,6 +99,13 @@ impl Visitor for Driver<'_, '_, '_> {
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
         self.fire_query(query);
+        // Children of this query (subqueries inside its body) are nested.
+        self.query_depth += 1;
+        ControlFlow::Continue(())
+    }
+
+    fn post_visit_query(&mut self, _query: &Query) -> ControlFlow<Self::Break> {
+        self.query_depth = self.query_depth.saturating_sub(1);
         ControlFlow::Continue(())
     }
 

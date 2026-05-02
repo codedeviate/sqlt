@@ -14,6 +14,13 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
     let mut v: Vec<Box<dyn Rule>> = vec![
         // perf
         Box::new(rules::perf::SelectStar),
+        Box::new(rules::perf::SelectStarQualified),
+        Box::new(rules::perf::LeadingWildcardLike),
+        Box::new(rules::perf::FunctionOnColumnInWhere),
+        Box::new(rules::perf::DistinctAsJoinFix),
+        Box::new(rules::perf::CountOfNullableColumn),
+        Box::new(rules::perf::ImplicitStringNumericCompare),
+        Box::new(rules::perf::OrAcrossColumns),
         // joins
         Box::new(rules::joins::ImplicitCrossJoin),
         Box::new(rules::joins::CrossJoinWithoutWhere),
@@ -31,6 +38,12 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(rules::correctness::OrderByPositional),
         Box::new(rules::correctness::HavingWithoutGroupBy),
         Box::new(rules::correctness::GroupByPositional),
+        // subquery
+        Box::new(rules::subquery::NotInSubqueryNullPitfall),
+        Box::new(rules::subquery::InSubqueryPreferExists),
+        Box::new(rules::subquery::ScalarSubqueryInSelect),
+        Box::new(rules::subquery::OrderByInSubqueryWithoutLimit),
+        Box::new(rules::subquery::CorrelatedSubqueryInWhere),
     ];
     v.sort_by_key(|r| r.meta().id);
     v

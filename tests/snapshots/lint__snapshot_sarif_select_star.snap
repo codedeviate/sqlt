@@ -189,6 +189,101 @@ expression: normalised
             },
             {
               "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "SQL three-valued logic strikes again. `x NOT IN (1, NULL)` evaluates to UNKNOWN for every x, not TRUE. Prefer `NOT EXISTS (SELECT 1 ... WHERE col = outer.x)`. Note: this is a heuristic — without schema info the linter cannot prove the inner column is NOT NULL. The diagnostic fires on every NOT IN subquery so reviewers can confirm."
+              },
+              "id": "SQLT0400",
+              "name": "not-in-subquery-null-pitfall",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "subquery"
+                ]
+              },
+              "shortDescription": {
+                "text": "`NOT IN (SELECT ...)` returns no rows if the subquery yields any NULL."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "A correlated EXISTS short-circuits as soon as it finds a match, while many planners materialize an IN subquery into a temporary set first. For single-column subqueries the two are equivalent in semantics; EXISTS is usually preferable. (Schema-blind: the suggestion may be unnecessary if your planner already optimizes IN to a semi-join — measure first if performance matters.)"
+              },
+              "id": "SQLT0401",
+              "name": "in-subquery-prefer-exists",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "subquery"
+                ]
+              },
+              "shortDescription": {
+                "text": "`IN (SELECT ...)` is often clearer and faster as `EXISTS`."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "`SELECT (SELECT count(*) FROM orders WHERE user_id = u.id) FROM users u` runs the inner subquery once per row in the outer FROM. A LEFT JOIN with GROUP BY or a lateral join is usually faster. Modern planners may rewrite this themselves; measure before assuming the rewrite is a win."
+              },
+              "id": "SQLT0402",
+              "name": "scalar-subquery-in-select",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "subquery"
+                ]
+              },
+              "shortDescription": {
+                "text": "Scalar subquery in the SELECT list runs once per row — N+1 risk."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Most planners ignore ORDER BY in a subquery whose ordering does not affect the outer result; the few that honor it spend cycles sorting only to throw the ordering away when joining. If you want a top-N within the subquery, add LIMIT."
+              },
+              "id": "SQLT0403",
+              "name": "order-by-in-subquery-without-limit",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "subquery"
+                ]
+              },
+              "shortDescription": {
+                "text": "ORDER BY inside a subquery / CTE / derived table without LIMIT is wasted work."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Correlated subqueries run per outer row. Many of them rewrite cleanly to a JOIN with GROUP BY or DISTINCT. Schema-blind heuristic: the linter flags any EXISTS/IN/Subquery in WHERE where the inner SELECT references a compound identifier (e.g. `outer.col`). False positives are possible; treat as a hint."
+              },
+              "id": "SQLT0404",
+              "name": "correlated-subquery-in-where",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "subquery"
+                ]
+              },
+              "shortDescription": {
+                "text": "A subquery in WHERE that references an outer column may be a JOIN candidate."
+              }
+            },
+            {
+              "defaultConfiguration": {
                 "level": "note"
               },
               "fullDescription": {
@@ -204,6 +299,139 @@ expression: normalised
               },
               "shortDescription": {
                 "text": "`SELECT *` returns every column, including ones the query does not need."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Disabled by default — qualified wildcards after a JOIN are often legitimate. Enable with `--rule SQLT0501` to flag every qualified wildcard for review."
+              },
+              "id": "SQLT0501",
+              "name": "select-star-qualified",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "`SELECT t.*` after a JOIN can hide which columns the query actually needs."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "A leading `%` means the optimiser cannot use an index range scan. For real text-search use a full-text index (FTS, MATCH AGAINST, ts_vector, FULLTEXT INDEX) or a trigram index. If you need substring search on a small table, document the intent so the next maintainer doesn't think it's an oversight."
+              },
+              "id": "SQLT0502",
+              "name": "leading-wildcard-like",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "`LIKE '%foo'` defeats normal B-tree indexes — every row must be scanned."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "`WHERE LOWER(name) = 'alice'` cannot use a btree index on `name`; the planner has to evaluate the function for every row. Either store the lowercased value in a generated column (or trigger), build a functional index, or rewrite the predicate to leave the column bare. Schema-blind heuristic — false positives occur when the column isn't indexed in the first place."
+              },
+              "id": "SQLT0503",
+              "name": "function-on-column-in-where",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "Wrapping a column in a function inside WHERE typically defeats index plans."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Tagging DISTINCT onto the projection is a common workaround for joins that duplicate rows. Usually a GROUP BY (or EXISTS for a semi-join) is cheaper and more accurate. Worth a closer look if the query is in a hot path."
+              },
+              "id": "SQLT0504",
+              "name": "distinct-as-join-fix",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "`SELECT DISTINCT` after a JOIN often masks a missing aggregation or EXISTS."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "If the intent is `how many rows`, use `COUNT(*)` (or `COUNT(1)`). If the intent is `how many rows have a non-NULL value in this column`, keep `COUNT(col)` and consider adding a comment so the next reader knows it's deliberate. Schema-blind: the linter doesn't know if the column is declared NOT NULL."
+              },
+              "id": "SQLT0505",
+              "name": "count-of-nullable-column",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "`COUNT(col)` skips NULL values; `COUNT(*)` counts every row."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Disabled by default. Implicit casts on column sides of comparisons can defeat index usage and on MySQL silently coerce string columns to numbers (with surprising results). The linter cannot know the column type without schema info; expect false positives. Enable with `--rule SQLT0506` for a focused review pass."
+              },
+              "id": "SQLT0506",
+              "name": "implicit-string-numeric-compare",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "Comparing a column to a string literal that looks numeric (or vice versa) may force an implicit cast."
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "fullDescription": {
+                "text": "Most planners can use one index per pass. An OR across two columns prevents the planner from picking either index, leading to a full scan. Rewriting as `UNION ALL` of two single-column predicates lets each branch use its own index."
+              },
+              "id": "SQLT0507",
+              "name": "or-across-columns",
+              "properties": {
+                "tags": [
+                  "sql",
+                  "perf"
+                ]
+              },
+              "shortDescription": {
+                "text": "`WHERE a = ? OR b = ?` rarely uses indexes — `UNION ALL` or `IN` is often faster."
               }
             },
             {

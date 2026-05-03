@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-03
+
 ### Added
 - Top-level `sqlt --examples` flag. Prints a cross-cutting overview with example invocations of every subcommand. Complements the existing per-subcommand `sqlt <COMMAND> --examples`.
 

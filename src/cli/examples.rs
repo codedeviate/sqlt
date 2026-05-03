@@ -9,29 +9,41 @@
 
 pub const TOP_LEVEL: &str = r#"sqlt — multi-dialect SQL parser, translator, and linter.
 
-Each subcommand has its own `--examples` page with deeper examples:
+Each subcommand has its own `--examples` page with detailed examples
+for every flag:
 
-  sqlt parse     --examples       SQL → JSON AST
-  sqlt emit      --examples       JSON AST → SQL
-  sqlt translate --examples       SQL → SQL via AST
-  sqlt lint      --examples       Analyze SQL for pitfalls
+  sqlt parse        --examples    SQL → JSON AST
+  sqlt emit         --examples    JSON AST → SQL
+  sqlt translate    --examples    SQL → SQL via AST
+  sqlt lint         --examples    Analyze SQL for pitfalls
+  sqlt build-schema --examples    Compile a reusable schema artifact
 
-Quick tour:
+Quick tour by subcommand:
 
-  # Parse a MariaDB schema, latin1 encoding, into JSON
-  sqlt parse --from mariadb -e iso-8859-1 schema.sql
+  # parse — SQL into a JSON AST envelope.
+  sqlt parse --from mariadb -e iso-8859-1 schema.sql > tree.json
+  echo "SELECT 1" | sqlt parse --from mysql --pretty
 
-  # Translate MariaDB → PostgreSQL via the AST
+  # emit — JSON AST back to SQL (typically the second half of a pipe).
+  sqlt parse --from mariadb tree.sql | sqlt emit --to postgres
+
+  # translate — rewrite SQL between dialects via the AST.
   sqlt translate --from mariadb --to postgres schema.sql > pg.sql
+  sqlt translate --from mysql --to mariadb --strict input.sql
 
-  # Lint a real production dump, surface only actionable findings
+  # lint — analyze for pitfalls.
   sqlt lint --from mariadb -e iso-8859-1 schema.sql
+  sqlt lint --from mariadb --schema bootstrap.sql --schema migrations/*.sql query.sql
+  sqlt lint --from mariadb --to postgres queries.sql   # pre-flight rules
+  sqlt lint -v schema.sql                              # surface raw-passthrough warnings
+  sqlt lint --explain SQLT0801                         # rule documentation
+  sqlt lint --list-rules                               # full ruleset
 
-  # Surface raw-passthrough warnings too (verbose)
-  sqlt lint --from mariadb -e iso-8859-1 -v schema.sql
-
-  # Get rule documentation
-  sqlt lint --explain SQLT0801
+  # build-schema — compile reusable JSON schema artifact.
+  sqlt build-schema --from mariadb \
+      --schema shop/bootstrap.sql --schema shop/migrations/*.sql \
+      -o shop_schema.json --pretty
+  sqlt lint --from mariadb --schema shop_schema.json query.sql
 
 Dialect aliases:
   mysql                                  MySQL 5.7+ / 8.0
@@ -274,49 +286,117 @@ and emits a JSON file that captures the *current* state of the schema.
 The artifact can be reloaded by `sqlt lint --schema schema.json` without
 re-parsing or re-replaying the original SQL.
 
-Use cases:
+────────────────────────────────────────────────────────────────────
+Flag reference
+────────────────────────────────────────────────────────────────────
 
-  # Compile a long migration history once, lint many times.
+  --from <DIALECT>          (required)
+      The SQL dialect used to parse every `--schema` file. Values:
+      mysql, mariadb, postgres (alias postgresql), mssql (alias tsql),
+      sqlite, generic.
+      Optional only when `--examples` is given.
+
+  --schema <FILE>           (repeatable, required)
+      Schema input file. Accepts:
+        * .sql  — parsed with `--from`, replayed via the DDL engine
+        * .json — a previously compiled artifact, merged into the
+                   running schema (so you can layer new migrations
+                   onto a precompiled base)
+      Files are processed in CLI order; the USE cursor and any
+      CREATE DATABASE state persist across files.
+
+  -e, --encoding <ENC>
+      How to decode the bytes of `.sql` schema files. Default: utf-8.
+      Aliases: latin1 = iso-8859-1, cp1252 = windows-1252.
+      JSON output is always written as UTF-8 (per JSON spec).
+
+  -o, --output <PATH>
+      Path to write the JSON artifact. Omit to write to stdout.
+
+  --pretty
+      Pretty-print the JSON output (indented, diff-friendly). Default
+      is compact one-line JSON.
+
+  --examples
+      Print this page and exit.
+
+────────────────────────────────────────────────────────────────────
+Common workflows
+────────────────────────────────────────────────────────────────────
+
+  # Most common: compile a migration history into a JSON artifact
+  # and lint against it. Cheap on every CI run.
   sqlt build-schema --from mariadb \
       --schema shop/bootstrap.sql \
       --schema shop/migrations/*.sql \
       -o shop_schema.json --pretty
   sqlt lint --from mariadb --schema shop_schema.json query.sql
 
-  # Mix a compiled base with fresh migrations on every lint:
+  # Layer late-arriving migrations on top of the artifact instead of
+  # rebuilding the artifact every time.
   sqlt lint --from mariadb \
       --schema shop_schema.json \
       --schema shop/migrations/2026-05-12-add-col.sql \
       query.sql
 
-  # Multi-database schemas (CREATE DATABASE / USE supported).
+  # Multi-database project: shop_db + global_db.
+  # CREATE DATABASE and USE statements in either file set up the
+  # namespaces; same-named tables across DBs do not collide.
   sqlt build-schema --from mariadb \
       --schema shop/bootstrap.sql \
       --schema global/bootstrap.sql \
       -o combined.json
   sqlt lint --from mariadb --schema combined.json queries.sql
 
-  # Schema files in Latin-1.
+  # Latin-1 schema files (real mariadb-dump output is often latin1).
   sqlt build-schema --from mariadb -e iso-8859-1 \
-      --schema dump.sql -o schema.json
+      --schema dump.sql \
+      -o schema.json
 
-  # Stdout output (default if --output is omitted).
+  # Inspect the artifact: stdout output piped to jq.
   sqlt build-schema --from mysql --schema bootstrap.sql --pretty | jq '.'
 
-What's tracked:
+  # Quick sanity-check: how many tables / databases did we end up with?
+  sqlt build-schema --from mariadb \
+      --schema schema.sql -o /tmp/s.json
+  jq '[.databases | to_entries[] | .value.tables | keys] | flatten | length' /tmp/s.json
+
+  # Inline schema for a one-off lint run via process substitution.
+  sqlt build-schema --from mysql --schema <(echo '
+      CREATE TABLE users (id INT NOT NULL, name VARCHAR(50));
+      ALTER TABLE users ADD COLUMN email VARCHAR(255);
+  ')
+
+────────────────────────────────────────────────────────────────────
+What gets tracked
+────────────────────────────────────────────────────────────────────
+
   - tables (per database; CREATE DATABASE / USE namespaces)
-  - columns (name, data type, nullable)
-  - indexes (named, unique, primary, fulltext, spatial; functional indexes
-    via the rendered SQL expression)
+  - columns (name, data type, nullable, primary-key membership)
+  - indexes (named, unique, primary, fulltext, spatial; functional
+    indexes via the rendered SQL expression)
   - primary keys
   - foreign keys (resolved through the USE cursor)
 
-Statements that don't affect the schema (INSERT, GRANT, DELIMITER + stored
-program bodies, …) emit a `note: skipping <kind>` line on stderr but never
-error.
+Statements that don't affect the schema (INSERT, UPDATE, DELETE, GRANT,
+DELIMITER + stored procedure bodies, ALTER TABLE ENABLE/DISABLE KEYS,
+…) emit a `note: skipping <kind>` line on stderr but never error.
 
-The artifact carries the sqlt version it was built with — `lint` warns to
-stderr on major.minor mismatch but still tries to load.
+────────────────────────────────────────────────────────────────────
+Versioning
+────────────────────────────────────────────────────────────────────
+
+The artifact records the sqlt version it was built with — `sqlt lint`
+emits a `note:` to stderr on a major.minor mismatch but still tries
+to load. Patch-version differences are accepted silently.
+
+────────────────────────────────────────────────────────────────────
+Exit codes
+────────────────────────────────────────────────────────────────────
+
+  0   schema compiled (any skip notes are advisory)
+  1   parse error, encoding error, or I/O error on a schema file
+  2   usage error (unknown dialect, no --schema given, bad flags)
 "#;
 
 pub fn print(text: &str) {

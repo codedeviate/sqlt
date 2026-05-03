@@ -14,6 +14,43 @@ use crate::encoding::Encoding;
 use crate::error::Result;
 use crate::lint::format::Format as LintFormat;
 
+const BUILD_SCHEMA_LONG_ABOUT: &str = "\
+Compile a reusable schema artifact from one or more SQL files.
+
+Reads each `--schema` file in CLI order, replays the DDL surface
+(CREATE/ALTER/DROP TABLE, CREATE INDEX, foreign-key constraints,
+CREATE DATABASE / USE for per-database namespacing), and emits a JSON
+artifact that captures the *current* state of the schema — not just the
+initial CREATE.
+
+Use cases:
+ - Compile a long migration history once, lint many times against the
+   compiled artifact (cheap on every CI run).
+ - Check the artifact into the repo so contributors lint against the
+   same schema without each running the full migration replay.
+ - Mix `.json` + late `.sql` migrations on top:
+     sqlt lint --from mariadb \\
+         --schema schema.json \\
+         --schema migrations/late.sql query.sql
+
+What's tracked:
+ - tables (per database)
+ - columns (name, data type, nullable)
+ - indexes (named, unique, primary, fulltext, spatial; functional via
+   the rendered SQL expression)
+ - primary keys, foreign keys (resolved through the USE cursor)
+
+Statements that don't affect the schema (INSERT, GRANT, DELIMITER +
+stored procedure bodies, …) emit `note: skipping <kind> at <file>:<line>`
+on stderr but never error.
+
+The artifact records the sqlt version it was built with — `sqlt lint`
+warns on major.minor mismatch but still tries to load.
+
+For real-world examples (multi-database, latin1, late-migration mixing,
+etc.) run:
+   sqlt build-schema --examples";
+
 const LINT_LONG_ABOUT: &str = "\
 Analyze SQL for pitfalls and improvement suggestions.
 
@@ -85,6 +122,7 @@ Reads input from:
  - stdin (when no path is given, or when `-` is passed)
 
 Discoverability:
+ - sqlt --examples              top-level overview + per-command examples
  - sqlt <COMMAND> --help        full long-form help for any subcommand
  - sqlt <COMMAND> --examples    in-depth usage examples
  - sqlt lint --list-rules       every registered lint rule with id + summary
@@ -103,10 +141,18 @@ Exit codes:
     version,
     about = "Multi-dialect SQL parser, translator, and linter",
     long_about = TOP_LEVEL_LONG_ABOUT,
+    arg_required_else_help = false,
+    subcommand_required = false,
 )]
 pub struct Cli {
+    /// Print a top-level overview with examples covering every
+    /// subcommand and the most common flag combinations, then exit.
+    /// For per-subcommand examples use `sqlt <COMMAND> --examples`.
+    #[arg(long = "examples", global = false)]
+    pub examples: bool,
+
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -142,13 +188,7 @@ pub enum Command {
     #[command(long_about = LINT_LONG_ABOUT)]
     Lint(LintArgs),
     /// Compile a reusable schema artifact from one or more SQL files.
-    ///
-    /// Reads `--schema` files (CREATE/ALTER/DROP TABLE, CREATE INDEX,
-    /// CREATE DATABASE, USE, …), replays the DDL, and emits a JSON file
-    /// that `sqlt lint --schema schema.json` can load directly. Useful
-    /// for repos with long migration histories — compile once, lint many
-    /// times. Mixing `.json` and `.sql` later is supported:
-    /// `sqlt lint --schema base.json --schema migrations/late.sql`.
+    #[command(long_about = BUILD_SCHEMA_LONG_ABOUT)]
     BuildSchema(BuildSchemaArgs),
 }
 
@@ -414,25 +454,33 @@ fn parse_encoding(s: &str) -> std::result::Result<Encoding, String> {
 
 #[derive(Debug, clap::Args)]
 pub struct BuildSchemaArgs {
-    /// Source SQL dialect (parses every `--schema` file with this dialect).
+    /// Source SQL dialect — parses every `--schema` file with this
+    /// dialect. Same accepted values as `parse --from`. Required for
+    /// normal runs; optional when `--examples` is given.
     #[arg(long = "from", value_parser = parse_dialect)]
     pub from: Option<DialectId>,
 
     /// Schema input file (repeatable). Each is parsed and replayed in CLI
-    /// order. Files with a `.json` extension are loaded as a previously
-    /// built artifact and merged in.
+    /// order; the `USE` cursor and CREATE DATABASE state persist across
+    /// files. Files with a `.json` extension are loaded as a previously
+    /// built artifact and merged in (so you can layer `.sql` migrations
+    /// on top of a compiled `.json` base).
     #[arg(long = "schema")]
     pub schemas: Vec<PathBuf>,
 
-    /// Encoding of the schema files.
+    /// Encoding of the schema input bytes. Same accepted values as
+    /// `parse --encoding`. JSON output is always written as UTF-8 per
+    /// the JSON spec; this flag governs how `.sql` schema files are
+    /// decoded.
     #[arg(long, short = 'e', value_parser = parse_encoding, default_value = "utf-8")]
     pub encoding: Encoding,
 
-    /// Output file path. Omit to write to stdout.
+    /// Output file path for the JSON artifact. Omit to write to stdout.
     #[arg(long, short = 'o')]
     pub output: Option<PathBuf>,
 
-    /// Pretty-print the JSON output.
+    /// Pretty-print the JSON output (indented for readability and diff
+    /// stability). Default is compact JSON on one line.
     #[arg(long)]
     pub pretty: bool,
 
@@ -443,7 +491,21 @@ pub struct BuildSchemaArgs {
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-    match cli.command {
+    if cli.examples {
+        examples::print(examples::TOP_LEVEL);
+        return Ok(());
+    }
+    let Some(command) = cli.command else {
+        // No subcommand and no `--examples` — replicate clap's default
+        // help-on-empty behaviour. `clap::Command::print_help` would need
+        // us to keep the `Command` instance around; the simplest path is
+        // to re-invoke ourselves with `--help`.
+        let mut cmd = <Cli as clap::CommandFactory>::command();
+        cmd.print_help().ok();
+        println!();
+        return Ok(());
+    };
+    match command {
         Command::Parse(args) => parse::run(args),
         Command::Emit(args) => emit::run(args),
         Command::Translate(args) => translate::run(args),

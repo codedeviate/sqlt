@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Top-level `sqlt --examples` flag. Prints a cross-cutting overview with example invocations of every subcommand. Complements the existing per-subcommand `sqlt <COMMAND> --examples`.
+
+### Changed
+- `sqlt build-schema --help` now renders the full long-form description (use cases, what's tracked, version handling) via a `BUILD_SCHEMA_LONG_ABOUT` constant. Previously only the one-line summary was visible from `--help`, requiring users to guess the syntax.
+- Per-flag descriptions on `BuildSchemaArgs` (every flag) describe accepted values, defaults, and interactions in line with the help-text policy in `CLAUDE.md`.
+- `sqlt build-schema --examples` rewritten to a four-section format: Flag reference (every flag, with defaults), Common workflows (covering each commonly-used flag combination), What gets tracked, Versioning, Exit codes. Includes process-substitution and jq-piping recipes.
+- `CLAUDE.md` "Help & examples maintenance rule" expanded with concrete standards: every subcommand variant must have a `long_about` (not just a one-line `///`), every flag mentioned in `--help` must appear in `--examples`, both `sqlt --examples` and `sqlt <COMMAND> --examples` must work. Listed as mandatory for every change that affects how the utility is used.
+
 ## [0.3.0] - 2026-05-02
 
 ### Added

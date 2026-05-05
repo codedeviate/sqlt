@@ -17,6 +17,12 @@ exclude = [
     ".idea/**",
     "target/**",
     "Formula/**",
+    "homebrew/",
+    ".github/",
+    "/.gitignore",
+    "OUT-OF-SCOPE.md",
+    "CLAUDE.md",
+    "BREW.md",
 ]
 
 [[bin]]

@@ -9,3 +9,6 @@ Cargo.lock.bak
 
 # OS
 .DS_Store
+
+# Local-only docs (maintainer runbooks)
+BREW.md

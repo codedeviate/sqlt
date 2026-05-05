@@ -89,4 +89,4 @@ See `CLAUDE.md` for project conventions (semver, conventional commits, changelog
 
 ## License
 
-Dual-licensed under MIT or Apache-2.0 at your option.
+MIT — see [`LICENSE-MIT`](LICENSE-MIT).

@@ -3,9 +3,21 @@ name = "sqlt"
 version = "0.3.1"
 edition = "2024"
 rust-version = "1.85"
+authors = ["codedeviate <codedv8@gmail.com>"]
 description = "Multi-dialect SQL parser and translator (MySQL, MariaDB, PostgreSQL, MSSQL, SQLite)"
 license = "MIT"
-repository = "https://github.com/thomasbjork/sqlt"
+readme = "README.md"
+homepage = "https://github.com/codedeviate/sqlt"
+repository = "https://github.com/codedeviate/sqlt"
+documentation = "https://docs.rs/sqlt"
+keywords = ["sql", "parser", "translator", "dialect", "lint"]
+categories = ["command-line-utilities", "database", "parser-implementations"]
+exclude = [
+    ".github/**",
+    ".idea/**",
+    "target/**",
+    "Formula/**",
+]
 
 [[bin]]
 name = "sqlt"
@@ -26,3 +38,8 @@ encoding_rs = "0.8"
 
 [dev-dependencies]
 insta = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"

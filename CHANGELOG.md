@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `LICENSE-MIT` file containing the full MIT License text. Previously the repo declared a license in `Cargo.toml` but shipped no LICENSE file.
+
+### Changed
+- `Cargo.toml` license field narrowed from `MIT OR Apache-2.0` to `MIT` to match the single LICENSE file in the repository.
+
 ## [0.3.1] - 2026-05-03
 
 ### Added

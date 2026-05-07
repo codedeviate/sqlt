@@ -1,63 +1,128 @@
-# Out of Scope (v1) and Known Limitations
+# Out of Scope & Wishlist
 
-This file tracks features and constructs deliberately deferred from v1, and known limitations of the v1 implementation. Move items out of this list as they ship.
+A living list of items raised during design, implementation, or feature sweeps
+that are either explicitly deferred, decided against, or noted as "maybe
+later". Also doubles as a wishlist — items under "Waiting" are things worth
+building once someone explicitly asks. Kept here so ideas don't disappear
+into the black hole of spec files after each release.
 
-## Known limitations in v1
+Organized into four buckets by reason for non-inclusion. When an item ships,
+remove it from this file and note the shipping version in the CHANGELOG
+entry rather than leaving a crossed-out line here.
 
-### MariaDB raw-SQL fallback for unrepresented constructs
+- **Waiting** — can be done; nobody's asked for it.
+- **Deferred** — possible to implement; actively put off (scope/complexity
+  trade-off or waiting on a concrete use case).
+- **Not yet supported** — blocked by upstream / ecosystem maturity; may ship
+  when the blocker clears.
+- **Out of scope** — fundamentally can't be implemented, architecturally
+  mismatched, or intentionally declined by policy.
 
-`sqlparser-rs` v0.59 lacks AST nodes for several MariaDB-specific constructs. v1 captures these as a raw-SQL fallback variant: parsing preserves the original text so that round-tripping (parse → emit) is lossless **for the same dialect**, but cross-dialect translation cannot rewrite them and will emit a warning + the original SQL.
+---
 
-Affected constructs:
-- `WITH SYSTEM VERSIONING` table option.
-- `PERIOD FOR SYSTEM_TIME (start_col, end_col)` column-level / table-level construct.
-- `FOR SYSTEM_TIME AS OF | BETWEEN | FROM ... TO | ALL` query-level temporal predicates.
-- `CREATE PACKAGE` / `CREATE PACKAGE BODY` (Oracle-compat mode).
-- MariaDB vector types (`VECTOR(N)`) and vector functions (`VEC_DISTANCE_*`, `VEC_FROMTEXT`, etc.).
-- Application-time period definitions (`PERIOD FOR <name> (start, end)` non-system-time).
+## Waiting
 
-The intent is to upstream typed AST support for these to `apache/datafusion-sqlparser-rs` and remove the fallback once accepted.
+### CLI / UX
+- Watch mode / continuous translation.
+- Web playground.
+- A library API stable enough for external crates to depend on (today `lib.rs`
+  re-exports exist for tests but carry no compatibility guarantee).
 
-## Deferred to later versions
+### Lint ergonomics
+- Per-line `-- sqlt:disable SQLT0500` suppression comments.
+- Per-rule severity overrides on the CLI (`--rule SQLT0500=warning` style).
+- Auto-fix / fix mode. Today `sqlt lint` reports only.
+
+## Deferred
 
 ### Dialects
-- BigQuery, ClickHouse, Snowflake, DuckDB, Redshift, Databricks, Hive — `sqlparser-rs` supports these but v1 does not expose them through `DialectId` to keep the surface focused.
+- BigQuery, ClickHouse, Snowflake, DuckDB, Redshift, Databricks, Hive —
+  `sqlparser-rs` supports these but the CLI does not expose them through
+  `DialectId` to keep the surface focused.
 - Oracle — same reasoning.
 - ANSI strict mode.
 
-### Parsing depth
-- Stored procedure / function / trigger bodies parsed beyond statement boundaries (currently treated as opaque blocks where the upstream parser does so).
-- Schema-aware semantic checks beyond what `sqlt lint` already does. v0.3 ships: same-input + external `--schema <file>` (SQL or pre-compiled JSON), full DDL replay (CREATE/ALTER/DROP TABLE, CREATE INDEX, FK constraints), per-database namespacing via `CREATE DATABASE`/`USE`, and a `sqlt build-schema` subcommand for compiling reusable artifacts. Foreign keys and indexes are tracked in the model but not yet consumed by any rule. See "Lint" below for what's still deferred.
-- Query plan analysis or optimization hints rewriting.
-
 ### Translation
-- Complex `MERGE` ↔ `INSERT ... ON CONFLICT/DUPLICATE` rewriting beyond the simple cases.
+- Complex `MERGE` ↔ `INSERT ... ON CONFLICT/DUPLICATE` rewriting beyond the
+  simple cases.
 - Stored-procedure dialect translation (PL/SQL ↔ T-SQL ↔ PL/pgSQL).
-- Comment preservation across translation (round-trip within one dialect preserves them via raw-SQL fallback; cross-dialect drops them).
+- Comment preservation across translation (round-trip within one dialect
+  preserves them via the raw-SQL fallback; cross-dialect drops them).
 - Index / constraint name normalization.
 
-### Lint
-- `.sqlt.toml` config file. v1 is CLI-flag-driven only. When this lands, the planned shape is `[lint] disabled = ["SQLT0500"]` and `[lint] severity = { SQLT0500 = "warning" }` overrides.
-- `SQLT0700` keyword-case-mixed — sqlparser strips raw token case in the AST; the rule cannot be implemented without re-tokenizing the source. We deliberately do *not* register this rule so `--rule SQLT0700` returns "unknown rule" rather than silently doing nothing.
-- Schema-aware features beyond the v0.3 baseline. **Already shipped:** `Schema` model with full DDL replay, `--schema <file>` (SQL and JSON), per-database namespacing, `sqlt build-schema` artifact compilation, SQLT0900 unknown-column, schema-aware refinement of SQLT0505 and SQLT0400. Indexes and foreign keys are recorded but not yet consumed. **Still out of scope:** an SQLT0503 refinement that consults the index list (would require deciding what counts as "indexed by `LOWER(col)`" for functional indexes), full type checking on every comparison (richer SQLT0506), CTE/VIEW expansion, ambiguous-column detection on multi-table joins, unknown-table warnings (too many false positives when the schema is in a different file from the queries), and FK-driven JOIN suggestions.
-- Other ⚠ schema-blind heuristic rules (SQLT0506 implicit-string-numeric-compare, SQLT0503 function-on-column-in-where) still rely on heuristics that produce false positives. They are gated behind opt-in defaults until full schema awareness lands.
-- Auto-fix / fix mode. v1 reports only.
-- Per-line `-- sqlt:disable SQLT0500` suppression comments.
-- Per-rule severity overrides on the CLI (`--rule SQLT0500=warning` style).
+### Lint depth
+- `.sqlt.toml` config file. Today the lint surface is CLI-flag-driven only.
+  When this lands, the planned shape is `[lint] disabled = ["SQLT0500"]` and
+  `[lint] severity = { SQLT0500 = "warning" }` overrides.
+- Schema-aware features beyond the v0.3 baseline. **Already shipped:**
+  `Schema` model with full DDL replay, `--schema <file>` (SQL and JSON),
+  per-database namespacing, `sqlt build-schema` artifact compilation,
+  SQLT0900 unknown-column, schema-aware refinement of SQLT0505 and SQLT0400.
+  Indexes and foreign keys are recorded but not yet consumed.
+  **Still deferred:** an SQLT0503 refinement that consults the index list
+  (would require deciding what counts as "indexed by `LOWER(col)`" for
+  functional indexes), full type checking on every comparison (richer
+  SQLT0506), CTE/VIEW expansion, ambiguous-column detection on multi-table
+  joins, unknown-table warnings (too many false positives when the schema
+  lives in a different file from the queries), and FK-driven JOIN suggestions.
+- Other ⚠ schema-blind heuristic rules (SQLT0506 implicit-string-numeric-compare,
+  SQLT0503 function-on-column-in-where) still rely on heuristics that produce
+  false positives. They are gated behind opt-in defaults until full schema
+  awareness lands.
+
+### Parsing depth
+- Query plan analysis or optimization-hints rewriting.
+
+### CLI / UX
+- A formatting/pretty-printer with knobs beyond `--pretty` (line width,
+  indent style, keyword case).
+- Error messages with byte positions when `sqlparser-rs` does not surface them.
 
 ### Encodings
 - UTF-16 (LE/BE) input/output and BOM detection.
-- Auto-detection of input encoding (`chardetng` integration). Today the user must pass `--encoding` explicitly; we deliberately don't guess because heuristic detection silently corrupts data on short inputs.
-- Mixed-encoding input (e.g. SQL files with comments in one encoding and string literals in another).
-- Encoding negotiation between `--from` and `--to` (e.g. translating Latin-1 source SQL to UTF-8 output as a single command).
+- Mixed-encoding input (e.g. SQL files with comments in one encoding and
+  string literals in another).
+- Encoding negotiation between `--from` and `--to` (e.g. translating Latin-1
+  source SQL to UTF-8 output as a single command).
 
-### CLI / UX
-- A formatting/pretty-printer with knobs beyond `--pretty` (line width, indent style, keyword case).
-- Watch mode / continuous translation.
-- A library API stable enough for external crates to depend on (v1 keeps `lib.rs` re-exports for tests but no compatibility guarantee).
-- Error messages with byte positions when `sqlparser-rs` does not surface them.
+## Not yet supported
 
-### Tooling
-- Pre-built binaries / release pipeline (`cargo install --git` is the v1 distribution path).
-- Homebrew / package manager publication.
-- Web playground.
+### MariaDB raw-SQL fallback for unrepresented constructs
+`sqlparser-rs` v0.59 lacks AST nodes for several MariaDB-specific constructs.
+The current implementation captures these as a raw-SQL fallback variant:
+parsing preserves the original text so that round-tripping (parse → emit) is
+lossless **for the same dialect**, but cross-dialect translation cannot
+rewrite them and will emit a warning + the original SQL.
+
+Affected constructs:
+- `WITH SYSTEM VERSIONING` table option.
+- `PERIOD FOR SYSTEM_TIME (start_col, end_col)` column-level / table-level
+  construct.
+- `FOR SYSTEM_TIME AS OF | BETWEEN | FROM ... TO | ALL` query-level temporal
+  predicates.
+- `CREATE PACKAGE` / `CREATE PACKAGE BODY` (Oracle-compat mode).
+- MariaDB vector types (`VECTOR(N)`) and vector functions (`VEC_DISTANCE_*`,
+  `VEC_FROMTEXT`, etc.).
+- Application-time period definitions (`PERIOD FOR <name> (start, end)`
+  non-system-time).
+
+The intent is to upstream typed AST support for these to
+`apache/datafusion-sqlparser-rs` and remove the fallback once accepted.
+
+### Stored program bodies
+Stored procedure / function / trigger bodies parsed beyond statement
+boundaries. Today they are treated as opaque blocks where the upstream parser
+does so; removing the opacity requires upstream parser support.
+
+## Out of scope
+
+### Encoding auto-detection
+Auto-detection of input encoding (e.g. `chardetng` integration). The user
+must pass `--encoding` explicitly. We deliberately don't guess because
+heuristic detection silently corrupts data on short inputs.
+
+### `SQLT0700` keyword-case-mixed
+`sqlparser-rs` strips raw token case in the AST; the rule cannot be
+implemented without re-tokenizing the source. The rule is intentionally not
+registered, so `--rule SQLT0700` returns "unknown rule" rather than silently
+doing nothing.

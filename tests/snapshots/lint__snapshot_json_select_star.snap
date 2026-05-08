@@ -1,9 +1,10 @@
 ---
 source: tests/lint.rs
+assertion_line: 42
 expression: "lint_json(\"SELECT * FROM users\", \"schema.sql\", DialectId::MySql)"
 ---
 {
-  "sqlt_version": "0.3.1",
+  "sqlt_version": "0.3.2",
   "source": "schema.sql",
   "diagnostics": [
     {

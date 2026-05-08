@@ -7,17 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-05-08
+
 ### Added
-- `LICENSE-MIT` file containing the full MIT License text. Previously the repo declared a license in `Cargo.toml` but shipped no LICENSE file.
-- `Cargo.toml` metadata required for `cargo publish` to crates.io: `authors`, `readme`, `homepage`, `documentation`, `keywords` (`sql`, `parser`, `translator`, `dialect`, `lint`), `categories` (`command-line-utilities`, `database`, `parser-implementations`), and an `exclude` list that keeps `.github/`, `.idea/`, `target/`, and `Formula/` out of the published tarball.
+- `LICENSE` file containing the full MIT License text. Previously the repo declared a license in `Cargo.toml` but shipped no LICENSE file.
+- `Cargo.toml` metadata required for `cargo publish` to crates.io: `authors`, `readme`, `homepage`, `documentation`, `keywords` (`sql`, `parser`, `translator`, `dialect`, `lint`), `categories` (`command-line-utilities`, `database`, `parser-implementations`), and an `exclude` list (`.github/**`, `.idea/**`, `target/**`, `/.gitignore`, `OUT-OF-SCOPE.md`, `CLAUDE.md`, `BREW.md`) that keeps maintainer-facing files out of the published tarball.
 - `[profile.release]` settings (`lto = true`, `codegen-units = 1`, `strip = "symbols"`) so binaries built by Homebrew (and anyone running `cargo install --path .`) are smaller. Trade-off: longer release build (~3 minutes vs. seconds).
-- `Formula/sqlt.rb` — Homebrew formula template. Targets `https://github.com/codedeviate/sqlt`, depends on `rust => :build`, builds via `std_cargo_args`. Test block exercises `--version`, `parse --from mysql` (stdin → JSON envelope), and a MariaDB → PostgreSQL `RETURNING` translation. Includes a release checklist for bumping the URL/sha256 on each tagged release.
+- `README.md` install section now documents Homebrew (`brew install codedeviate/cli/sqlt`) and crates.io (`cargo install sqlt`) alongside the existing `cargo install --path .` source build.
 
 ### Changed
+- Homebrew distribution now lives in the consolidated `codedeviate/homebrew-cli` tap; the in-repo `Formula/sqlt.rb` template was retired in favour of the tap's authoritative copy. The crate tarball no longer carries a Homebrew formula.
 - `Cargo.toml` license field narrowed from `MIT OR Apache-2.0` to `MIT` to match the single LICENSE file in the repository.
 - `Cargo.toml` `repository` field corrected from `https://github.com/thomasbjork/sqlt` to `https://github.com/codedeviate/sqlt` (the actual remote).
-- `LICENSE-MIT` copyright holder set to `codedeviate` to match the publishing identity used on crates.io and Homebrew.
-- `README.md` License section updated from the stale "Dual-licensed under MIT or Apache-2.0" text to a single MIT note that links to `LICENSE-MIT`.
+- `LICENSE` copyright holder set to `codedeviate` to match the publishing identity used on crates.io and Homebrew.
+- `README.md` License section updated from the stale "Dual-licensed under MIT or Apache-2.0" text to a single MIT note that links to `LICENSE`.
 
 ## [0.3.1] - 2026-05-03
 

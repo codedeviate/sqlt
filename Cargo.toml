@@ -1,10 +1,10 @@
 [package]
 name = "sqlt"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 rust-version = "1.85"
 authors = ["codedeviate <codedv8@gmail.com>"]
-description = "Multi-dialect SQL parser and translator (MySQL, MariaDB, PostgreSQL, MSSQL, SQLite)"
+description = "SQL parser, translator, and linter for MySQL, MariaDB, Postgres, MSSQL, SQLite"
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/codedeviate/sqlt"
@@ -13,13 +13,14 @@ documentation = "https://docs.rs/sqlt"
 keywords = ["sql", "parser", "translator", "dialect", "lint"]
 categories = ["command-line-utilities", "database", "parser-implementations"]
 exclude = [
+    ".claude/**",
+    ".git/**",
     ".github/**",
     ".idea/**",
     "target/**",
     "/.gitignore",
     "OUT-OF-SCOPE.md",
     "CLAUDE.md",
-    "BREW.md",
 ]
 
 [[bin]]

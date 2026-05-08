@@ -9,6 +9,13 @@ Parses SQL from MySQL, MariaDB, PostgreSQL, MSSQL (T-SQL), and SQLite into a JSO
 ## Install
 
 ```bash
+# Homebrew (macOS / Linux) — via the codedeviate tap
+brew install codedeviate/cli/sqlt
+
+# crates.io
+cargo install sqlt
+
+# From a clone of this repo
 cargo install --path .
 ```
 
@@ -89,4 +96,4 @@ See `CLAUDE.md` for project conventions (semver, conventional commits, changelog
 
 ## License
 
-MIT — see [`LICENSE-MIT`](LICENSE-MIT).
+MIT — see [`LICENSE`](LICENSE).

@@ -1,5 +1,12 @@
 # sqlt
 
+[![GitHub](https://img.shields.io/badge/github-codedeviate%2Fsqlt-181717?logo=github)](https://github.com/codedeviate/sqlt)
+[![Latest release](https://img.shields.io/badge/release-v0.3.2-blue)](https://github.com/codedeviate/sqlt/releases)
+[![crates.io](https://img.shields.io/crates/v/sqlt?logo=rust&label=crates.io)](https://crates.io/crates/sqlt)
+[![Homebrew](https://img.shields.io/badge/homebrew-codedeviate%2Fcli%2Fsqlt-fbb040?logo=homebrew)](https://github.com/codedeviate/homebrew-cli)
+[![Rust edition 2024](https://img.shields.io/badge/rust-2024_edition_(MSRV_1.85)-dea584?logo=rust)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Multi-dialect SQL parser and translator in Rust.
 
 Parses SQL from MySQL, MariaDB, PostgreSQL, MSSQL (T-SQL), and SQLite into a JSON AST, emits SQL back from JSON, and translates between dialects.

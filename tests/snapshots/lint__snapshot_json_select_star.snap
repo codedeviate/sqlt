@@ -4,7 +4,7 @@ assertion_line: 42
 expression: "lint_json(\"SELECT * FROM users\", \"schema.sql\", DialectId::MySql)"
 ---
 {
-  "sqlt_version": "0.3.2",
+  "sqlt_version": "0.3.3",
   "source": "schema.sql",
   "diagnostics": [
     {

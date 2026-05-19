@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-05-19
+
 ### Added
 - `man/sqlt.1` system man page shipped with the crate tarball. After `brew install codedeviate/cli/sqlt` (or any other install path that drops the file onto `$MANPATH`) `man sqlt` renders the full reference: NAME, SYNOPSIS, DESCRIPTION, COMMANDS, DIALECTS, ENCODINGS, LINT RULE CATEGORIES, TRANSLATION WARNINGS, EXAMPLES, EXIT STATUS, FILES, ENVIRONMENT, SEE ALSO, BUGS, AUTHOR.
 - Colorized `--examples` output across every subcommand, matching the recon-style scheme (yellow-bold section headers, bold sub-headings, cyan commands, green shell comments, dimmed dividers and notes). Respects `NO_COLOR` / `CLICOLOR_FORCE`.

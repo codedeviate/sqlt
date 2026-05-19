@@ -48,6 +48,8 @@ sqlt lint --explain SQLT0300                             # rule documentation
 
 Reads from a file path or stdin (use `-` or omit the path).
 
+After installing via Homebrew, `man sqlt` opens the full system man page (sections: SYNOPSIS, COMMANDS, DIALECTS, ENCODINGS, LINT RULE CATEGORIES, TRANSLATION WARNINGS, EXAMPLES, EXIT STATUS, FILES, ENVIRONMENT). The source for the page lives at `man/sqlt.1`.
+
 ### Dialects
 
 `mysql`, `mariadb`, `postgres` (alias `postgresql`), `mssql` (alias `tsql`), `sqlite`, `generic`.

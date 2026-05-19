@@ -1,0 +1,297 @@
+.\" Manpage for sqlt.
+.\" Keep in sync with src/cli/mod.rs (clap doc comments and *_LONG_ABOUT),
+.\" src/cli/examples.rs (the --examples constants), README.md, and
+.\" CHANGELOG.md whenever any user-visible behaviour changes.
+.TH SQLT 1 "2026-05-19" "sqlt 0.3.2" "User Commands"
+.SH NAME
+sqlt \- multi-dialect SQL parser, translator, and linter
+.SH SYNOPSIS
+.B sqlt
+[\fB\-\-examples\fR] [\fB\-\-help\fR] [\fB\-\-version\fR]
+.br
+.B sqlt parse
+\fB\-\-from\fR \fIDIALECT\fR [\fB\-\-pretty\fR] [\fB\-e\fR \fIENC\fR] [\fIFILE\fR|\fB\-\fR]
+.br
+.B sqlt emit
+[\fB\-\-to\fR \fIDIALECT\fR] [\fB\-e\fR \fIENC\fR] [\fIFILE\fR|\fB\-\fR]
+.br
+.B sqlt translate
+\fB\-\-from\fR \fISRC\fR \fB\-\-to\fR \fIDST\fR [\fB\-\-strict\fR] [\fB\-e\fR \fIENC\fR] [\fIFILE\fR|\fB\-\fR]
+.br
+.B sqlt lint
+\fB\-\-from\fR \fISRC\fR [\fB\-\-to\fR \fIDST\fR] [\fB\-\-format\fR \fIFMT\fR]
+[\fB\-\-rule\fR \fIID\fR]... [\fB\-\-no\-rule\fR \fIID\fR]...
+[\fB\-\-severity\fR \fILVL\fR] [\fB\-\-exit\-on\fR \fILVL\fR]
+[\fB\-\-help\-mode\fR \fIMODE\fR | \fB\-\-no\-help\fR]
+[\fB\-\-schema\fR \fIFILE\fR]... [\fB\-\-verbose\fR] [\fB\-e\fR \fIENC\fR] [\fIFILE\fR|\fB\-\fR]
+.br
+.B sqlt lint
+\fB\-\-explain\fR \fIID\fR
+.br
+.B sqlt lint
+\fB\-\-list\-rules\fR
+.br
+.B sqlt build-schema
+\fB\-\-from\fR \fIDIALECT\fR \fB\-\-schema\fR \fIFILE\fR... [\fB\-o\fR \fIPATH\fR] [\fB\-\-pretty\fR] [\fB\-e\fR \fIENC\fR]
+.SH DESCRIPTION
+.B sqlt
+parses SQL written in any of the supported dialects into a JSON AST
+envelope, emits SQL back from that envelope, translates between dialects
+via the AST, and lints SQL for portability, performance, and correctness
+pitfalls.
+.PP
+Each subcommand reads input from a positional \fIFILE\fR argument or
+from stdin when \fIFILE\fR is omitted or given as \fB\-\fR. All JSON I/O
+is UTF-8 per the JSON spec; the \fB\-\-encoding\fR flag governs only the
+SQL byte encoding.
+.PP
+MariaDB is treated as a first-class target distinct from MySQL.
+\fImariadb-dump\fR-only constructs (\fI/*!NNN ... */\fR conditional
+comments, \fBDELIMITER\fR directives, system versioning, \fBCREATE
+PACKAGE\fR, \fBCREATE SEQUENCE\fR, \fBFOR SYSTEM_TIME\fR, optimization
+hints, \fBDEFINER\fR clauses) are recognised, preprocessed, and either
+parsed or wrapped as \fIRaw\fR fragments rather than silently rejected.
+.SH COMMANDS
+.TP
+.B parse
+SQL \[->] JSON AST. Reads SQL with \fB\-\-from\fR \fIDIALECT\fR and emits
+a JSON envelope \fB{ sqlt_version, dialect, statements }\fR. Use
+\fB\-\-pretty\fR for indented JSON. See \fBsqlt parse \-\-examples\fR.
+.TP
+.B emit
+JSON AST \[->] SQL. Reads the envelope produced by \fBsqlt parse\fR and
+writes SQL via the sqlparser \fIDisplay\fR impl. \fB\-\-to\fR overrides
+the dialect recorded in the envelope. See \fBsqlt emit \-\-examples\fR.
+.TP
+.B translate
+SQL \[->] SQL via AST. Parses with \fB\-\-from\fR, runs the per-dialect
+rewriter that converts source-only constructs to target equivalents (or
+warns when no equivalent exists), and emits SQL in \fB\-\-to\fR.
+Warnings go to stderr; \fB\-\-strict\fR turns any warning into exit code
+3. See \fBsqlt translate \-\-examples\fR.
+.TP
+.B lint
+Analyzes SQL for pitfalls and improvement suggestions. Runs a curated
+ruleset (\(ti38 rules across 8 categories) over the parsed AST. Output
+formats: \fBtext\fR (default), \fBpretty\fR, \fBjson\fR, \fBsarif\fR.
+\fB\-\-explain\fR \fIID\fR and \fB\-\-list\-rules\fR document the ruleset
+offline. See \fBsqlt lint \-\-examples\fR.
+.TP
+.B build-schema
+Compiles one or more \fB\-\-schema\fR files (CREATE/ALTER/DROP TABLE,
+CREATE INDEX, foreign-key constraints, USE/CREATE DATABASE) into a
+reusable JSON artifact. \fBsqlt lint \-\-schema\fR \fIartifact.json\fR
+reloads the compiled state without re-parsing the migration history. See
+\fBsqlt build-schema \-\-examples\fR.
+.SH DIALECTS
+Accepted values for \fB\-\-from\fR and \fB\-\-to\fR:
+.TP
+\fBmysql\fR
+MySQL 5.7+ / 8.0.
+.TP
+\fBmariadb\fR (alias \fBmaria\fR)
+MariaDB \(em first-class target.
+.TP
+\fBpostgres\fR (aliases \fBpostgresql\fR, \fBpg\fR)
+PostgreSQL.
+.TP
+\fBmssql\fR (aliases \fBtsql\fR, \fBsqlserver\fR)
+Microsoft SQL Server (T-SQL).
+.TP
+\fBsqlite\fR
+SQLite.
+.TP
+\fBgeneric\fR
+Permissive fallback dialect.
+.SH ENCODINGS
+Accepted values for \fB\-\-encoding\fR / \fB\-e\fR:
+.TP
+\fButf\-8\fR
+Default. Always used for JSON I/O.
+.TP
+\fBiso\-8859\-1\fR (alias \fBlatin1\fR)
+Latin-1 / ISO-8859-1 8-bit code page.
+.TP
+\fBwindows\-1252\fR (alias \fBcp1252\fR)
+Windows-1252 (Latin-1 superset).
+.PP
+Decoding is strict \(em invalid byte sequences are rejected with exit
+code 1, never silently substituted with U+FFFD.
+.SH "LINT RULE CATEGORIES"
+.TP
+\fBraw\fR \(em SQLT00xx
+Raw passthrough (off by default; see \fB\-v\fR).
+.TP
+\fBdialect\-xc\fR \(em SQLT01xx
+Dialect cross-contamination (e.g. backtick in postgres).
+.TP
+\fBpre\-flight\fR \(em SQLT02xx
+Translation pre-flight (only when \fB\-\-to\fR is set).
+.TP
+\fBjoins\fR \(em SQLT03xx
+Implicit cross joins, NATURAL JOIN, ON 1=1.
+.TP
+\fBsubquery\fR \(em SQLT04xx
+IN (SELECT) \[->] EXISTS, correlated subqueries.
+.TP
+\fBperf\fR \(em SQLT05xx
+SELECT *, leading-wildcard LIKE, function-on-column.
+.TP
+\fBcorrectness\fR \(em SQLT06xx
+= NULL, UPDATE/DELETE without WHERE.
+.TP
+\fBstyle\fR \(em SQLT07xx
+Unaliased derived tables, LIMIT without ORDER BY.
+.TP
+\fBddl\fR \(em SQLT08xx
+Float-for-money, VARCHAR without length.
+.PP
+\fB\-\-rule\fR \fIID\fR and \fB\-\-no\-rule\fR \fIID\fR accept the full
+id (\fBSQLT0500\fR), short numeric (\fB0500\fR / \fB500\fR), or slug
+(\fBselect\-star\fR). \fB\-\-explain\fR \fIID\fR prints a rule's summary,
+long-form explanation, default severity, and default-enabled state.
+.SH "TRANSLATION WARNINGS"
+Stable codes emitted on stderr by \fBsqlt translate\fR:
+.TP
+\fBRETURNING_DROPPED\fR
+Target dialect lacks RETURNING.
+.TP
+\fBSEQUENCE_DROPPED\fR
+Target dialect lacks CREATE SEQUENCE.
+.TP
+\fBON_DUPLICATE_KEY_UNSUPPORTED\fR
+Target dialect lacks ON DUPLICATE KEY UPDATE.
+.TP
+\fBRAW_PASSTHROUGH\fR
+Source had a Raw fragment with no faithful target equivalent.
+.PP
+Use \fB\-\-strict\fR to make any warning a non-zero exit (code 3).
+.SH EXAMPLES
+.PP
+Parse SQL \[->] JSON AST:
+.PP
+.RS 4
+.nf
+echo "SELECT 1" | sqlt parse \-\-from mysql \-\-pretty
+.fi
+.RE
+.PP
+Emit JSON AST \[->] SQL:
+.PP
+.RS 4
+.nf
+sqlt parse \-\-from postgres schema.sql | sqlt emit \-\-to mysql
+.fi
+.RE
+.PP
+Translate between dialects:
+.PP
+.RS 4
+.nf
+sqlt translate \-\-from mariadb \-\-to postgres input.sql
+.fi
+.RE
+.PP
+Strict translation (fail the build on any warning):
+.PP
+.RS 4
+.nf
+sqlt translate \-\-from mariadb \-\-to mysql \-\-strict schema.sql
+.fi
+.RE
+.PP
+Lint a MariaDB schema (Latin-1):
+.PP
+.RS 4
+.nf
+sqlt lint \-\-from mariadb \-e iso\-8859\-1 schema.sql
+.fi
+.RE
+.PP
+Lint with translation pre-flight against Postgres:
+.PP
+.RS 4
+.nf
+sqlt lint \-\-from mariadb \-\-to postgres schema.sql
+.fi
+.RE
+.PP
+JSON output for tooling:
+.PP
+.RS 4
+.nf
+sqlt lint \-\-from mariadb \-\-format json schema.sql > findings.json
+.fi
+.RE
+.PP
+SARIF for GitHub code-scanning:
+.PP
+.RS 4
+.nf
+sqlt lint \-\-from mariadb \-\-format sarif schema.sql > out.sarif
+.fi
+.RE
+.PP
+Compile a migration history once, lint against it on every PR:
+.PP
+.RS 4
+.nf
+sqlt build-schema \-\-from mariadb \\
+    \-\-schema shop/bootstrap.sql \-\-schema shop/migrations/*.sql \\
+    \-o shop_schema.json
+sqlt lint \-\-from mariadb \-\-schema shop_schema.json query.sql
+.fi
+.RE
+.PP
+Documentation discoverability:
+.PP
+.RS 4
+.nf
+sqlt lint \-\-list\-rules                  # full ruleset
+sqlt lint \-\-explain SQLT0801             # one rule
+sqlt <command> \-\-examples                # in-depth examples
+sqlt \-\-examples                          # cross-cutting overview
+.fi
+.RE
+.SH "EXIT STATUS"
+.TP
+.B 0
+Clean run.
+.TP
+.B 1
+Parse error, encoding error, I/O error, or lint findings \(>= \fB\-\-exit\-on\fR threshold.
+.TP
+.B 2
+Usage error (unknown dialect, unknown rule, bad flag combination).
+.TP
+.B 3
+.B sqlt translate \-\-strict
+saw at least one warning.
+.SH FILES
+Input is read from a positional path or from stdin (omit the path or
+pass \fB\-\fR). \fBsqlt build-schema \-\-output\fR \fIPATH\fR writes the
+JSON artifact; \fBsqlt lint \-\-schema\fR \fIPATH\fR accepts both
+\fI.sql\fR and \fI.json\fR artifacts.
+.SH ENVIRONMENT
+.TP
+.B NO_COLOR
+When set (any value), disables ANSI colour in \fB\-\-examples\fR and
+lint output.
+.TP
+.B CLICOLOR_FORCE
+When set, forces ANSI colour even when stdout is not a TTY.
+.SH "SEE ALSO"
+.PP
+\fBsqlt \-\-examples\fR, \fBsqlt \fIcommand\fB \-\-help\fR, \fBsqlt
+\fIcommand\fB \-\-examples\fR.
+.PP
+Project README and CHANGELOG ship with the source distribution; the
+canonical repository is
+.UR https://github.com/codedeviate/sqlt
+.UE .
+.SH BUGS
+Report bugs at
+.UR https://github.com/codedeviate/sqlt/issues
+.UE .
+.SH AUTHOR
+codedeviate <codedv8@gmail.com>

@@ -17,7 +17,10 @@ for every flag:
   sqlt translate    --examples    SQL → SQL via AST
   sqlt lint         --examples    Analyze SQL for pitfalls
   sqlt build-schema --examples    Compile a reusable schema artifact
-  sqlt man                        Full man-page-style manual
+
+For a system man page, install sqlt via the codedeviate Homebrew tap
+(or copy `man/sqlt.1` from the repo into a directory on $MANPATH) and
+run `man sqlt`.
 
 Quick tour by subcommand:
 

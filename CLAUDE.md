@@ -37,9 +37,10 @@ Single binary `sqlt` with these subcommands:
 - `sqlt translate --from <src> --to <dst> [--strict] [-e <encoding>] [file|-]` — SQL → SQL via AST.
 - `sqlt lint --from <src> [--to <dst>] [--format …] [--rule …] [--no-rule …] [--severity …] [--exit-on …] [--explain <id>] [--list-rules] [-v] [-e <encoding>] [file|-]` — analyze SQL for pitfalls and suggest improvements.
 - `sqlt build-schema --from <dialect> --schema <file>... [-o <path>] [--pretty] [-e <encoding>]` — compile a reusable schema artifact.
-- `sqlt man` — prints a man-page-style manual (NAME / SYNOPSIS / DESCRIPTION / COMMANDS / DIALECTS / ENCODINGS / LINT RULE CATEGORIES / TRANSLATION WARNINGS / EXAMPLES / EXIT STATUS / FILES / ENVIRONMENT / SEE ALSO / BUGS / AUTHOR).
 
-Every functional subcommand accepts `--examples` (prints in-depth usage and exits) and `--help` (full long-form docs). The top level (`sqlt --examples`, `sqlt --help`) shows a cross-cutting overview.
+Every subcommand accepts `--examples` (prints in-depth usage and exits) and `--help` (full long-form docs). The top level (`sqlt --examples`, `sqlt --help`) shows a cross-cutting overview.
+
+A full system man page is shipped in `man/sqlt.1` (groff/troff format) and is installed by the Homebrew tap (`#{man1}/sqlt.1`), so users get `man sqlt` after `brew install codedeviate/cli/sqlt`. The crate tarball includes `man/sqlt.1` automatically (it is NOT in the `Cargo.toml` `exclude` list).
 
 ### Help & examples maintenance rule (mandatory)
 
@@ -66,17 +67,17 @@ The two surfaces are independent:
 1. The field's `///` doc comment (or the `<COMMAND>_LONG_ABOUT` constant if multi-paragraph).
 2. The matching `src/cli/examples.rs` constant — including the Flag reference section.
 3. `TOP_LEVEL_LONG_ABOUT` if the change introduces a new discoverability surface (a new subcommand, a new top-level flag like `--examples`).
-4. **`src/cli/man.rs` (`MANUAL` constant)** — the `sqlt man` document is the single combined reference for every flag, dialect, encoding, exit code, environment variable, lint rule category, and translation warning code. Every user-visible change MUST be reflected here in the same commit. The exact sections it owns: NAME, SYNOPSIS, DESCRIPTION, COMMANDS, DIALECTS, ENCODINGS (`--encoding` / `-e`), LINT RULE CATEGORIES, TRANSLATION WARNINGS, EXAMPLES, EXIT STATUS, FILES, ENVIRONMENT, SEE ALSO, BUGS, AUTHOR. If your change touches any of those concepts, edit `MANUAL` accordingly.
+4. **`man/sqlt.1`** — the installed system man page (rendered by `man sqlt` after `brew install codedeviate/cli/sqlt`) is the single combined reference for every flag, dialect, encoding, exit code, environment variable, lint rule category, and translation warning code. Every user-visible change MUST be reflected here in the same commit. The exact sections it owns: `NAME`, `SYNOPSIS`, `DESCRIPTION`, `COMMANDS`, `DIALECTS`, `ENCODINGS`, `LINT RULE CATEGORIES`, `TRANSLATION WARNINGS`, `EXAMPLES`, `EXIT STATUS`, `FILES`, `ENVIRONMENT`, `SEE ALSO`, `BUGS`, `AUTHOR`. Also bump the `.TH` header's date and version when releasing. Verify changes render by running `man -P cat man/sqlt.1` before committing — bad roff (mismatched `.RS`/`.RE`, missing `.fi` after `.nf`) produces silently broken output.
 5. README's relevant section if user-facing.
 6. `CHANGELOG.md`.
 
 Failing to do (1), (2), and (4) together is grounds for a follow-up commit before the change is considered done.
 
-### Colorized `--examples` and `sqlt man` (mandatory)
+### Colorized `--examples` (mandatory)
 
-Both surfaces share the post-processor in `src/cli/style.rs::print_colored`. It applies recon-style ANSI styling to plain-text constants line-by-line:
+The `--examples` output goes through `src/cli/style.rs::print_colored`, which applies recon-style ANSI styling to the plain-text constants in `src/cli/examples.rs` line-by-line:
 
-- The first non-blank line of the constant is the **title** (bold). Each `--examples` and `MANUAL` constant must therefore start with a one-line title.
+- The first non-blank line of each constant is the **title** (bold). Every `--examples` constant must therefore start with a one-line title.
 - Lines made entirely of `─` are dividers (dimmed). Section headers (`Flag reference`, `Common workflows`, …) belong between two divider lines so they pick up the yellow-bold treatment.
 - Shell comments inside example blocks must start with `# ` and be indented ≥ 2 spaces (`  # From a file`). These render green.
 - Command lines must start with one of: `sqlt`, `echo`, `printf`, `brew`, `cargo`, `jq`, `cp`, `mv`, `git` (after ≥ 2 leading spaces). These render cyan. Continuation lines (≥ 4 spaces, inside the same block) inherit the cyan treatment until a blank line resets the block.
@@ -105,7 +106,7 @@ src/
 ├── main.rs                     # binary entry → cli::run()
 ├── lib.rs                      # re-exports for integration tests
 ├── error.rs                    # thiserror Error type
-├── cli/{mod,parse,emit,translate,lint,build_schema,examples,man,style}.rs
+├── cli/{mod,parse,emit,translate,lint,build_schema,examples,style}.rs
 ├── dialect/
 │   ├── mod.rs                  # DialectId enum + FromStr + upstream() factory
 │   ├── mariadb.rs              # MariaDbDialect — wraps MySqlDialect

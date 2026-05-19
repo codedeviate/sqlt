@@ -2,7 +2,6 @@ pub mod build_schema;
 pub mod emit;
 pub mod examples;
 pub mod lint;
-pub mod man;
 pub mod parse;
 pub mod style;
 pub mod translate;
@@ -127,7 +126,7 @@ Discoverability:
  - sqlt --examples              top-level overview + per-command examples
  - sqlt <COMMAND> --help        full long-form help for any subcommand
  - sqlt <COMMAND> --examples    in-depth usage examples
- - sqlt man                     full man-page-style manual (pipe to less)
+ - man sqlt                     full system man page (installed by package)
  - sqlt lint --list-rules       every registered lint rule with id + summary
  - sqlt lint --explain <ID>     long-form documentation for one rule
 
@@ -193,13 +192,6 @@ pub enum Command {
     /// Compile a reusable schema artifact from one or more SQL files.
     #[command(long_about = BUILD_SCHEMA_LONG_ABOUT)]
     BuildSchema(BuildSchemaArgs),
-    /// Print the sqlt manual.
-    ///
-    /// Renders a single man-page-style document covering every
-    /// subcommand, flag, dialect, encoding, lint rule category,
-    /// translation warning code, exit code, and environment variable.
-    /// Pipe to a pager for navigation: `sqlt man | less -R`.
-    Man,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -521,7 +513,6 @@ pub fn run() -> Result<()> {
         Command::Translate(args) => translate::run(args),
         Command::Lint(args) => lint::run(args),
         Command::BuildSchema(args) => build_schema::run(args),
-        Command::Man => man::run(),
     }
 }
 

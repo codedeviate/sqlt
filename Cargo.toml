@@ -39,6 +39,8 @@ clap = { version = "4", features = ["derive"] }
 thiserror = "2"
 anyhow = "1"
 encoding_rs = "0.8"
+colored = "3"
+libc = "0.2.186"
 
 [dev-dependencies]
 insta = "1"

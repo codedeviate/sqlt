@@ -17,6 +17,7 @@ for every flag:
   sqlt translate    --examples    SQL → SQL via AST
   sqlt lint         --examples    Analyze SQL for pitfalls
   sqlt build-schema --examples    Compile a reusable schema artifact
+  sqlt man                        Full man-page-style manual
 
 Quick tour by subcommand:
 
@@ -400,5 +401,5 @@ Exit codes
 "#;
 
 pub fn print(text: &str) {
-    print!("{text}");
+    crate::cli::style::print_colored(text);
 }

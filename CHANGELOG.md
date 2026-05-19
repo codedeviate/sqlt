@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `sqlt man` subcommand prints a man-page-style manual (NAME, SYNOPSIS, DESCRIPTION, COMMANDS, DIALECTS, ENCODINGS, LINT RULE CATEGORIES, TRANSLATION WARNINGS, EXAMPLES, EXIT STATUS, FILES, ENVIRONMENT, SEE ALSO, BUGS, AUTHOR). Output is ANSI-colored on a TTY; pipe to `less -R` for paging.
+- Colorized `--examples` output across every subcommand, matching the recon-style scheme (yellow-bold section headers, bold sub-headings, cyan commands, green shell comments, dimmed dividers and notes). Respects `NO_COLOR` / `CLICOLOR_FORCE`.
+- `README.md` header now ships a badge row (GitHub, latest release, crates.io, Homebrew tap, Rust edition / MSRV, MIT license).
+
+### Changed
+- Default SIGPIPE behaviour is restored at startup on Unix, so `sqlt man | less` (or any other pager / `head` / `grep`) closing early ends the process quietly instead of panicking on the next `println!`.
+
 ## [0.3.2] - 2026-05-08
 
 ### Added

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- CI MSRV job (Rust 1.85) no longer fails on `ar_archive_writer` (uses `let` chains stabilised in 1.88). The offending crate is pulled in only as a build-dependency of `psm` starting at `psm 0.1.28`, so `Cargo.lock` pins `psm = 0.1.27` — the last release before the `ar_archive_writer` build-dep was added — keeping the resolved graph compatible with our declared MSRV. Avoid `cargo update -p psm` unless MSRV is bumped to ≥ 1.88 first.
+
 ## [0.3.3] - 2026-05-19
 
 ### Added

@@ -15,7 +15,7 @@ cargo fmt --check                 # format check
 
 **Always build a release version at the same time as a debug version.** Whenever you run `cargo build`, also run `cargo build --release` (and likewise for any per-milestone build verification). Release builds catch optimizer-only issues, surface real binary sizes, and keep `target/release/sqlt` in sync with what's on the development branch.
 
-MSRV: Rust 1.85 (edition 2024).
+MSRV: Rust 1.88 (edition 2024).
 
 ## README badges
 

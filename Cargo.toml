@@ -2,7 +2,7 @@
 name = "sqlt"
 version = "0.3.3"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 authors = ["codedeviate <codedv8@gmail.com>"]
 description = "SQL parser, translator, and linter for MySQL, MariaDB, Postgres, MSSQL, SQLite"
 license = "MIT"

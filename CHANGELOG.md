@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-05-20
+
 ### Changed
 - MSRV bumped from Rust 1.85 to 1.88. The lint module already used `let` chains (stabilised in 1.88) in `src/lint/mod.rs`, `correctness.rs`, `joins.rs`, and `perf.rs`; the 1.85 claim only held locally because contributor toolchains were newer. CI never actually exercised it — the MSRV (1.85) job aborted earlier in the build on `ar_archive_writer` (build-dep of `psm 0.1.28+`) for the same reason. Updated `Cargo.toml` `rust-version`, the README MSRV badge, `CLAUDE.md`, and `.github/workflows/ci.yml`.
+- README release badge switched from a static `release-vX.Y.Z-blue` shield to shields.io's dynamic `github/v/release` endpoint, so the badge tracks the latest GitHub release automatically and no longer needs a manual bump per version.
+
+### Fixed
+- Two `if cond { if let … { … } }` nests in `src/lint/format/pretty.rs` and `src/lint/registry.rs` collapsed into single let-chains. Modern clippy (1.95+) flags them under `clippy::collapsible_if` now that let-chains are stable, and the stable CI job was failing on `-D warnings`.
 
 ## [0.3.3] - 2026-05-19
 

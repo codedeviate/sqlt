@@ -13,7 +13,7 @@ cargo clippy -- -D warnings       # lint (fail on warnings)
 cargo fmt --check                 # format check
 ```
 
-**Always build a release version at the same time as a debug version.** Whenever you run `cargo build`, also run `cargo build --release` (and likewise for any per-milestone build verification). Release builds catch optimizer-only issues, surface real binary sizes, and keep `target/release/sqlt` in sync with what's on the development branch.
+**When you build the release target, skip the debug target.** A `cargo build --release` covers the verification surface I care about — optimizer-only issues, real binary size, `target/release/sqlt` in sync with the branch — so doing both back-to-back is wasted time. If a debug build is needed, it will either be invoked separately as part of a normal `cargo build` / `cargo test` flow, or I'll ask for it explicitly. Don't pair `cargo build` and `cargo build --release` by default.
 
 MSRV: Rust 1.88 (edition 2024).
 

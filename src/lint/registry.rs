@@ -108,10 +108,10 @@ fn build_lookup(rules: &[Box<dyn Rule>]) -> BTreeMap<String, RuleId> {
         // Numeric-only short form: "SQLT0500" → "0500" → "500".
         if let Some(num) = meta.id.as_str().strip_prefix("SQLT") {
             m.insert(num.to_string(), meta.id);
-            if let Some(stripped) = num.trim_start_matches('0').strip_prefix("") {
-                if !stripped.is_empty() {
-                    m.insert(stripped.to_string(), meta.id);
-                }
+            if let Some(stripped) = num.trim_start_matches('0').strip_prefix("")
+                && !stripped.is_empty()
+            {
+                m.insert(stripped.to_string(), meta.id);
             }
         }
     }

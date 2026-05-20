@@ -56,10 +56,10 @@ pub fn render(source: &str, source_text: &str, diagnostics: &[Diagnostic]) -> St
         if let Some(s) = &d.suggestion {
             let _ = writeln!(&mut out, "    help: {s}");
         }
-        if shown_explanation.insert(d.rule_name) {
-            if let Some(meta) = all.iter().find(|r| r.meta().id == d.rule).map(|r| r.meta()) {
-                let _ = writeln!(&mut out, "    explanation: {}", meta.explanation);
-            }
+        if shown_explanation.insert(d.rule_name)
+            && let Some(meta) = all.iter().find(|r| r.meta().id == d.rule).map(|r| r.meta())
+        {
+            let _ = writeln!(&mut out, "    explanation: {}", meta.explanation);
         }
         out.push('\n');
     }

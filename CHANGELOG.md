@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-05-22
+
+### Changed
+- `src/lib.rs` now embeds `README.md` at the crate root via `#![doc = include_str!("../README.md")]`, so docs.rs renders the full project README as the crate landing page instead of the previous one-line placeholder. Previously docs.rs showed only `sqlt — multi-dialect SQL parser and translator. See CLAUDE.md for the project guide and README.md for usage.`, which was unhelpful for anyone arriving from crates.io.
+- `README.md` flag-reference block under `### Lint` retagged from an untagged fenced block to ```` ```text ````, so rustdoc no longer treats it as a Rust doctest when the README is embedded as crate docs.
+
 ## [0.3.4] - 2026-05-20
 
 ### Changed

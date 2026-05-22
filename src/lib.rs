@@ -1,6 +1,4 @@
-//! `sqlt` — multi-dialect SQL parser and translator.
-//!
-//! See `CLAUDE.md` for the project guide and `README.md` for usage.
+#![doc = include_str!("../README.md")]
 
 pub mod ast;
 pub mod cli;

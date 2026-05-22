@@ -79,7 +79,7 @@ When a construct has no faithful equivalent in the target dialect (e.g. translat
 
 Common flags:
 
-```
+```text
 --from <dialect>          required; the source SQL dialect
 --to   <dialect>          optional; enables translation pre-flight rules
 --format text|pretty|json|sarif      output format (default text)

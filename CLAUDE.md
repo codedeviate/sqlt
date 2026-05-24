@@ -187,14 +187,59 @@ docs: document --strict flag in README
 
 Sections in order: Added / Changed / Deprecated / Removed / Fixed / Security.
 
-### Tagging implies a GitHub release
-When you push a `vX.Y.Z` tag, immediately create the matching GitHub release:
+### Tagging implies three downstream publishes — same release, no exceptions
+
+When you push a `vX.Y.Z` tag, the release isn't complete until all three surfaces below are updated. A tag with only one or two updated leaves install paths out of sync: shields.io badges turn stale, `cargo install sqlt` and `brew upgrade sqlt` keep returning the old version, and anyone following the README installs an older binary. Treat all three as part of the tag — same flow, no follow-up commits needed on this repo itself.
+
+#### 1. GitHub release
 
 ```sh
 gh release create vX.Y.Z --generate-notes
 ```
 
-A tag without a release leaves the GitHub Releases page out of sync with tag history and hides the version from anyone browsing the repo's front page. Treat the release as part of the tag — same step, no follow-up commits needed.
+#### 2. crates.io
+
+From the repo root, with the new version already in `Cargo.toml`:
+
+```sh
+cargo publish
+```
+
+The crate name is **`sqlt`** (per `Cargo.toml [package] name`); the binary is also `sqlt`. Requires `cargo login` to have been run once (token stored in `~/.cargo/credentials.toml`). `cargo publish` runs its own checks (clean working tree, no path-dependencies, etc.) and aborts cleanly if anything is wrong — fix the underlying issue rather than passing `--allow-dirty`.
+
+Verify the crate tarball still includes `man/sqlt.1` after any `Cargo.toml [package].exclude` edit — the man page is what the Homebrew formula's `man1.install "man/sqlt.1"` depends on for `man sqlt` after `brew install`. Run `cargo publish --dry-run` and confirm the file list includes `man/sqlt.1`.
+
+#### 3. Homebrew tap (`../homebrew-cli/`)
+
+The tap repo at `../homebrew-cli/` carries `Formula/sqlt.rb`. Update two fields:
+
+- `url "https://github.com/codedeviate/sqlt/archive/refs/tags/vX.Y.Z.tar.gz"`
+- `sha256 "<new-tarball-sha256>"`
+
+Compute the sha256 from the GitHub-generated tarball after the release exists. **Always pass `-H "Cache-Control: no-cache"` so the fetch bypasses any intermediate caches (your ISP, corporate proxy, local resolver) and goes through to GitHub's origin:**
+
+```sh
+curl -sL -H "Cache-Control: no-cache" \
+    https://github.com/codedeviate/sqlt/archive/refs/tags/vX.Y.Z.tar.gz \
+    | shasum -a 256
+```
+
+**Important: GitHub's auto-generated tarball CDN can serve a transient/incomplete payload for the first minute or two after the tag is pushed.** Run the `shasum` command twice with a short pause between, and only proceed if both runs return the same hash. If they differ, wait 30–60 seconds and re-check until the hash stabilises. Using an unstable hash is the single most common cause of "homebrew reports wrong checksum" reports after a release — the tap history (`git log --oneline ../homebrew-cli`) shows multiple `... — fix sha256` follow-ups across recon, batty, webrunner. recon v0.85.0 hit this exact race because the recheck without `Cache-Control: no-cache` re-read the same cached payload twice (a "stable" but wrong hash); the mismatch surfaced only when users ran `brew install`.
+
+The `Cache-Control: no-cache` rule isn't optional even on a "fresh" shell. Network paths cache aggressively; a single `curl` without the header is allowed to return whatever was last cached for that URL — which can be an early CDN payload that no longer matches what GitHub serves to homebrew clients.
+
+Then commit and push the tap repo:
+
+```sh
+cd ../homebrew-cli
+git add Formula/sqlt.rb
+git commit -m "sqlt X.Y.Z"
+git push origin main   # tap default branch is `main`, not `master`
+```
+
+(Tap commits follow the convention `<formula> X.Y.Z` — see `git log --oneline` in `../homebrew-cli` for examples.)
+
+If `shasum` produces a hash that, after pasting into `sqlt.rb`, makes `brew install --build-from-source sqlt` fail with "SHA256 mismatch", recompute against the URL the formula points to (case matters — `vX.Y.Z` not `VX.Y.Z`) and amend with a follow-up commit like the existing `... — fix sha256` precedents in the tap log.
 
 ## Test layout
 
